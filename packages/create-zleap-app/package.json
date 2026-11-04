@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zleap-ai/zleap-app-kit.git",
+    "url": "git+https://github.com/RuoFeng2015/zleap-app-kit.git",
     "directory": "packages/create-zleap-app"
   },
   "type": "module",
@@ -26,7 +26,7 @@
     "cliVersion": "0.10.0",
     "sdkPackage": "@zleap-ai/app-sdk",
     "sdkVersion": "0.10.0",
-    "skillsRepo": "zleap-ai/zleap-app-kit"
+    "skillsRepo": "RuoFeng2015/zleap-app-kit"
   },
   "keywords": [
     "zleap",

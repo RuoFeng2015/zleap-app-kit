@@ -7,8 +7,8 @@
   "cliPackage": "@zleap-ai/app-cli",
   "sdkPackage": "@zleap-ai/app-sdk",
   "createPackage": "create-zleap-app",
-  "skillsRepo": "zleap-ai/zleap-app-kit",
-  "repositoryUrl": "https://github.com/zleap-ai/zleap-app-kit",
+  "skillsRepo": "RuoFeng2015/zleap-app-kit",
+  "repositoryUrl": "https://github.com/RuoFeng2015/zleap-app-kit",
   "platforms": [
     {
       "os": "darwin",

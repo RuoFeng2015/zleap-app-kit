@@ -36,12 +36,12 @@ npm run deploy           # 构建 → 平台检查 → 上传开发版本（appi
 
 ```bash
 npx create-zleap-app@latest skills [项目目录]                  # 从 npm 包复制到 .agents/skills 与 .claude/skills（推荐，离线可用）
-# 本仓库在 GitHub 公开后，也可以用 skills CLI 安装 / 全局安装：
-npx skills add zleap-ai/zleap-app-kit
-npx skills add zleap-ai/zleap-app-kit -g -a codex -a claude-code -a pi -a opencode -y
+# 也可以用 skills CLI 从 GitHub 安装 / 全局安装：
+npx skills add RuoFeng2015/zleap-app-kit
+npx skills add RuoFeng2015/zleap-app-kit -g -a codex -a claude-code -a pi -a opencode -y
 ```
 
-Claude Code 也可以作为插件市场添加：`/plugin marketplace add zleap-ai/zleap-app-kit`。
+Claude Code 也可以作为插件市场添加：`/plugin marketplace add RuoFeng2015/zleap-app-kit`。
 
 支持 MCP 的工具还可以接入 CLI 自带的 MCP 服务（先在终端 `npx @zleap-ai/app-cli auth login ...`）：
 

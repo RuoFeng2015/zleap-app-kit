@@ -5,7 +5,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zleap-ai/zleap-app-kit.git",
+    "url": "git+https://github.com/RuoFeng2015/zleap-app-kit.git",
     "directory": "packages/app-sdk"
   },
   "type": "module",
