@@ -151,6 +151,7 @@
 | `VERSION_CONFLICT`     | 乐观锁冲突，或键已存在等 409 类错误        | 重新读取最新版本再改                                        |
 | `DOCUMENT_NOT_FOUND`   | 文档不存在（或 404 类错误）                | 检查文档键；读取时可用 `throwOnNotFound: false`             |
 | `COLLECTION_NOT_FOUND` | 集合不存在                                 | 在 Manifest `data.collections` 声明；生产环境要单独开通集合 |
+| `SCOPE_FORBIDDEN`      | 读写了 manifest **没声明**的集合（或没授权） | 先在 `data.collections` 声明再部署；已声明还报这个，看「权限」里是否勾了数据读写 |
 | `INDEX_REQUIRED`       | 查询需要扫描的行数超过单次上限             | 给筛选字段建索引；已有索引仍超限时缩小筛选范围              |
 | `RESOURCE_NOT_READY`   | 云数据库正在开通，或数据服务还没加载本应用 | 通常一分钟内自动就绪，稍后刷新重试                          |
 

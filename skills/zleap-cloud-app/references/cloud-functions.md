@@ -117,7 +117,7 @@
 要点：
 
 - `provider.permissions.capabilities` 必须是 `requires` 的子集；`permissions.data[].collection` 必须在 `data.collections` 里——否则上传被拒；
-- `input_schema` 会在**提交时**校验（不符返回 `INVOCATION_INPUT_INVALID`），`output_schema` 会约束函数返回值；
+- `input_schema` 会在**提交时**校验：不符时前端 SDK 抛 `SCHEMA_INVALID`（服务端原因 `INVOCATION_INPUT_INVALID`，HTTP 业务码 42200），`output_schema` 会约束函数返回值；
 - `background.modes` 要含 `"on_demand"` 才能被手动 / 应用调用；定时触发还要含 `"scheduled"`（见 [触发器](triggers.md)）；
 - `background.on_install` 固定为 `"disabled"`：**安装不会让任何后台能力自动运行**。
 
@@ -279,6 +279,14 @@ await zl.cloud.os.database.mutate({
 
 可用参数：`collection`、`operation`、`document_key`（`add` 以外必填）、`data`、`value_types`、`field_operations`、
 `expected_version`（`add` 不接受）、`operation_id`、`request_id`（必填）。`remove` 不接受 `data`。
+
+返回值形如 `{ operation_id, stats, document: { _id, _version } }`：`document._id` 是新文档（`add`）或被写文档的键，
+`document._version` 是写入后的版本号，下次 `update` / `remove` 时作为 `expected_version` 传回去。
+
+```js
+const saved = await zl.cloud.os.database.mutate({ collection: 'drafts', operation: 'add', data, request_id: `${context.invocationId}:add` });
+return { id: saved.document._id, version: saved.document._version };
+```
 
 > **字段命名是 snake_case**（危险）
 >
@@ -661,7 +669,7 @@ console.log(job.result);
 | `jobs.wait({ jobId, timeoutSeconds?, pollMilliseconds? })`                           | 等到终态；`timeoutSeconds` 0–300（默认 25），`pollMilliseconds` 100–5000（默认 500）；超时仍未结束抛 `CALL_TIMEOUT`（带 `jobId`） |
 | `jobs.get({ jobId })` / `jobs.result({ jobId })`                                     | 读一次当前状态                                                                                                                    |
 | `jobs.submit({ kind: 'capability', capability, input, operationId?, waitSeconds? })` | 与 `capabilities.invoke` 等价的另一种写法                                                                                         |
-| `jobs.cancel({ jobId })`                                                             | 请求取消，返回 `{ cancelRequested: true }`。**取消不是回滚**                                                                      |
+| `jobs.cancel({ jobId })`                                                             | 请求取消，返回 `{ cancelRequested: true }`。排队中或函数还没开始写数据时，作业以 `cancelled` 结束；正在执行的函数会被立即停止，结果为 `cancelled`。**取消不是回滚**：已提交的写入不会撤销 |
 
 同一个 `operationId` 再次提交、输入相同 → 返回原作业；输入不同 → 冲突「同一操作编号的输入不同」。
 每人同时在排队 / 执行的后台作业最多 16 个（超出 429「本人后台调用队列已满」）。

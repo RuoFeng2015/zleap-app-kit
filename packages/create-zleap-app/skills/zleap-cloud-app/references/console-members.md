@@ -43,8 +43,10 @@
 1. **新项目：用脚手架创建，自动带上 appid**
 
    ```bash
-   npm create zleap-app@latest my-app -- --appid zl3f9a2c7e1b0d4a68
+   npm create zleap-app@latest my-app -- --appid zl3f9a2c7e1b0d4a68 --name "客户拜访"
    ```
+
+   `--name` 填控制台里的应用名：发布时应用名以 `manifest.json` 的 `name` 为准，不填会用目录名（这里是 `my-app`）。
 
 2. **已有项目：把 appid 写进 manifest.json**
 
