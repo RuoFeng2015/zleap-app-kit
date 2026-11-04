@@ -229,6 +229,12 @@ async function deploy() {
     log(`把本人安装从 version_id=${current} 切换到 ${versionId}`);
     const updated = cli(['update', appId, '--expected-version-id', current, '--version-id', versionId]);
     if (updated.code !== 0) {
+      if (/COLLECTION_PARTITION_IMMUTABLE/.test(updated.stderr)) {
+        throw new StepError(
+          '新版本改了已有集合的 private / shared（数据归属），平台拒绝切换（COLLECTION_PARTITION_IMMUTABLE），当前安装保持原版本。\n' +
+            '集合建好后归属不能改：把这些集合的 partition 改回和当前版本一致；要换归属请新建一个集合并迁移数据。',
+        );
+      }
       if (/DATA_MIGRATION_REQUIRED/.test(updated.stderr)) {
         throw new StepError(
           '新版本改动了 data / storage 声明，平台拒绝直接切换（DATA_MIGRATION_REQUIRED），当前安装保持原版本。\n' +
