@@ -63,9 +63,9 @@ switch (command) {
     out({ app_id: rest[0], items: [], publications: [] });
     break;
   case 'release': {
-    if (state.releaseNeedsUploader) {
-      out({ code: 40900, detail: { reason: 'UPLOADER_NOT_ON_VERSION' } });
-      fail('平台错误 40900: 发布带云资源的版本前，上传者需要正在使用这个版本 detail={"reason":"UPLOADER_NOT_ON_VERSION"}');
+    if (state.releaseDatabaseNotReady) {
+      out({ code: 40900, detail: { reason: 'PROD_DATABASE_NOT_READY' } });
+      fail('平台错误 40900: 生产数据库还没就绪，暂时不能发布 detail={"reason":"PROD_DATABASE_NOT_READY"}');
     }
     const target = rest[rest.indexOf('--version-id') + 1];
     out({ app_id: rest[0], version_id: target, version: '1.0.0', unchanged: false });

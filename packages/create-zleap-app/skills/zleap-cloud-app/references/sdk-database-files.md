@@ -118,7 +118,7 @@ const caps = await zl.cloud.os.ready();
 | `document-core/1`  | `get` / `count` / `add` / `set` / `update` / `remove` / `operations.get` | 数据库已就绪、Manifest 的 `data.collections` 非空、已授予 `cloud.database.read` 或 `write`（`data.schemas` 可选，不写就是灵活集合）      |
 | `watch-snapshot/1` | `watch()`                                                                | 在上一条基础上，声明并授予了 `cloud.database.read`                                                                                       |
 | `storage-object/1` | `uploadFile` / `downloadFile` / `deleteFile` / `os.files.*`              | 部署启用了对象存储、授予了 `cloud.storage.read` 或 `write`；生产数据域还要求当前安装绑定了已就绪的签名发布                               |
-| `app-execution/1`  | `callFunction` / `os.capabilities` / `os.jobs`                           | 当前安装有已激活的后台能力授权（发布并「激活开发」，且在应用窗口「权限」里勾选了后台能力）；缺失时抛 `BACKGROUND_CAPABILITY_UNAVAILABLE` |
+| `app-execution/1`  | `callFunction` / `os.capabilities` / `os.jobs`                           | 当前安装有已启用的后台能力授权（在应用窗口「权限」里勾选了后台能力；`appid` 应用的发布绑定由平台自动完成，旧 `app_key` 应用还需「激活开发」）；缺失时抛 `BACKGROUND_CAPABILITY_UNAVAILABLE` |
 
 ```js
 const { profiles } = await zl.cloud.os.ready();

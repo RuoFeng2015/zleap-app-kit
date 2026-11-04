@@ -31,7 +31,7 @@ npm create zleap-app@latest <目录> -- --appid <appid> --name "<应用名>" -y
 （`zl` + 16 位小写十六进制，如 `zl3f9a2c7e1b0d4a68`），创建者自动成为管理员。没有 `appid` 时非交互脚手架会报错并提示先创建应用——问用户要，不要猜。
 manifest 里写 `"appid": "<appid>"`，**不需要** `app_key` 和 `publisher`。旧项目的 `app_key`（如 `com.example.todo`）只为已有应用保留；`--app-key` 是 `--appid` 的旧别名。
 同事要一起开发，请管理员在控制台「团队」→「成员」里把他加为开发者。每个成员的每次上传都是一个开发版本，在控制台「版本管理」里可见；
-成员可以用「我也用这个」运行同事上传、未发布的版本（非成员看不到开发版本）。给全企业用 = 在「版本管理」里「发布为线上版本」，见 skill `zleap-cloud-app-release`。
+成员可以在「版本管理」用「切换到此版本」运行同事上传、未发布的版本（只切自己的安装；非成员看不到开发版本）。带云函数的版本上传时平台自动签名、安装 / 切换 / 允许后台运行时自动绑定，appid 应用不需要签名激活操作。给全企业用 = 在「版本管理」里「发布为线上版本」，见 skill `zleap-cloud-app-release`。
 
 ## 2. 硬性约束（违反就会在运行时失败）
 
@@ -97,8 +97,8 @@ manifest 里写 `"appid": "<appid>"`，**不需要** `app_key` 和 `publisher`�
 | 连接超时 `CALL_TIMEOUT`、独立预览 | 不在 zleapOS 窗口里运行；部署后从启动台打开 |
 | `RESOURCE_NOT_READY` / SDK 没协商到 `document-core/1` | 当前数据域没有环境或数据库未就绪 → 等 1 分钟后重开应用；仍不行请用户在控制台概览检查开发环境与数据库 |
 | `SCOPE_FORBIDDEN` | 没授权（服务端原因 `CONSENT_REQUIRED` 等）→ 请用户点窗口顶部「权限」勾选保存；或 `requires` 没声明 |
-| `ENV_FORBIDDEN` | 部署已开放生产、应用还没有生产环境，非发布者打不开 → 发布者激活到生产（见 release skill） |
-| `COLLECTION_NOT_FOUND`（上生产后） | 生产环境建了但没开通集合 → 控制台生产环境「数据库」开通，或 `npx zleap-app prepare` |
+| `ENV_FORBIDDEN` | 部署已开放生产、应用还没有生产环境，非成员打不开 → appid 应用：任一成员「发布为线上版本」（平台自动准备生产）；旧应用：发布者激活到生产（见 release skill） |
+| `COLLECTION_NOT_FOUND`（上生产后） | 生产环境建了但没开通集合 → appid 应用重新「发布为线上版本」（生产库未就绪时发布会报 `PROD_DATABASE_NOT_READY`，稍后重试）；旧应用控制台生产环境「数据库」开通，或 `npx zleap-app prepare` |
 | `PUBLISHER_REQUIRED` | 非发布者访问开发数据域（默认只给发布者） |
 | `SCHEMA_INVALID` | 写入字段与集合结构不符（缺必填、类型错、多了字段） |
 | `VERSION_CONFLICT` | 别处先改过，重读后再改 |

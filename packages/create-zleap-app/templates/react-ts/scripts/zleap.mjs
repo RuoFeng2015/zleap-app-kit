@@ -342,8 +342,16 @@ async function release() {
   const result = cli(args);
   if (result.code !== 0) {
     if (needLogin(result.stderr)) throw new StepError(`${result.stderr}\n先运行 npm run login`);
-    if (/UPLOADER_NOT_ON_VERSION/.test(result.stderr + result.stdout)) {
-      throw new StepError('带云资源的版本第一次发布前，上传者需要正在使用这个版本：上传者先 npm run deploy（会自动切换），再发布。');
+    const output = result.stderr + result.stdout;
+    if (/PROD_DATABASE_NOT_READY/.test(output)) {
+      throw new StepError('生产数据库还没就绪，暂时不能发布：通常 1 分钟内就绪，稍后再 npm run release；持续失败请在云开发控制台「数据库」查看状态。');
+    }
+    if (/UPLOADER_INACTIVE/.test(output)) {
+      throw new StepError('这个版本的上传者账号已停用，无法发布：重新 npm run deploy 上传一个版本，再发布。');
+    }
+    if (/UPLOADER_NOT_ON_VERSION/.test(output)) {
+      // 旧版平台才会返回：新平台任一成员都能发布任一版本
+      throw new StepError('当前平台版本要求上传者正在使用这个版本：上传者先 npm run deploy（会自动切换），再发布。');
     }
     throw new StepError(`发布失败：${result.stderr || result.stdout}`);
   }

@@ -170,10 +170,10 @@ test('npm run release：发布最近一次部署的版本（非交互需 --yes�
   assert.match(refused.stderr, /旧命名空间应用/);
 });
 
-test('npm run release：带云资源版本上传者不在该版本时给出处理办法', () => {
-  const app = project({ releaseNeedsUploader: true }, 'zl0123456789abcdef');
+test('npm run release：生产数据库还没就绪时给出处理办法', () => {
+  const app = project({ releaseDatabaseNotReady: true }, 'zl0123456789abcdef');
   assert.equal(app.deploy().status, 0);
   const result = app.run('release', '--yes');
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /上传者先 npm run deploy/);
+  assert.match(result.stderr, /稍后再 npm run release/);
 });

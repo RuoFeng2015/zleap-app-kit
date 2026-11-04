@@ -115,8 +115,8 @@
 
 1. 触发器指向的**后台能力已启用**：在应用窗口「权限」的「后台能力（定时任务 / 云函数）」里勾选，
    或在 后台能力面板（文档站 /console/functions#后台能力） 点「允许后台运行」（安装时后台能力一律是停用）；
-2. 如果该能力的 provider 是云函数（`managed_function`），当前安装还要绑定**就绪并已激活**的发布
-   （appid 应用在版本管理（文档站 /console/release）页下方「开发环境：云函数激活」），否则执行时报 `FUNCTION_RELEASE_REQUIRED`；
+2. 如果该能力的 provider 是云函数（`managed_function`），当前安装还要绑定**就绪**的签名发布，否则执行时报 `FUNCTION_RELEASE_REQUIRED`。
+   appid 应用由平台在上传时自动签名、安装 / 切换版本 / 授权时自动绑定，不需要手动操作；旧 `app_key` 应用要在版本与激活（文档站 /console/legacy-release#激活开发）完成「激活开发」；
 3. Manifest 里**确实声明了**这个触发器；
 4. `background.modes` 包含对应模式。
 
@@ -378,7 +378,7 @@
 
 ### 报 `TRIGGER_MODE_NOT_DECLARED`
 
-`background.modes` 里没有 `"scheduled"`（或 `"events"`）。补上后上传新版本、把安装更新到该版本，再到「版本管理」页下方「开发环境：云函数激活」重新激活（云函数类能力需要）。
+`background.modes` 里没有 `"scheduled"`（或 `"events"`）。补上后上传新版本、把安装更新到该版本（appid 应用切换时平台自动绑定新版本的就绪发布；旧 `app_key` 应用云函数类能力还要重新「激活开发」）。
 
 ### 报 `TRIGGER_NOT_DECLARED`
 
@@ -400,7 +400,7 @@ Manifest 里找不到这个触发器 ID、ID 重复，或它的 `capability` 指
 
 1. 后台能力是「已允许后台运行」吗？显示「授权给的是之前安装的版本」时触发器会暂停，需要重新授权。
    切换版本后：应用中心「更新」只会让**权限变宽**的能力需要重新确认；CLI `zleap-app update` / `rollback` 会**停用全部**后台能力；
-2. 云函数类能力：当前安装绑定了就绪发布吗？运行记录里出现 `FUNCTION_RELEASE_REQUIRED` 就到「版本管理」页下方「开发环境：云函数激活」完成激活；
+2. 云函数类能力：当前安装绑定了就绪发布吗？运行记录里出现 `FUNCTION_RELEASE_REQUIRED` 时，appid 应用在应用窗口「权限」里重新保存一次或在「版本管理」切换一次版本（平台自动补签并绑定），旧 `app_key` 应用到「版本与激活」完成「激活开发」；
 3. 「接下来」的时间是不是还没到？
 4. 数据库是否正在冻结（备份/恢复中）？
 5. 看卡片的「最近投递」，再到 日志（文档站 /console/logs） 按调用编号查有没有执行记录。
