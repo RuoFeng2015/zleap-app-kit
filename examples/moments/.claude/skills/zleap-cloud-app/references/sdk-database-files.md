@@ -79,7 +79,7 @@ const db = zl.cloud.database();
 
 > **为什么用 `DYNAMIC_CURRENT_ENV`**（提示）
 >
-> 数据域（dev / prod）是「部署 + 当前用户 + 应用有没有生产环境」决定的：开发数据域默认只对开发团队（`appid` 应用成员 / 旧应用上传者）开放；
+> 数据域（dev / prod）是「部署 + 当前用户 + 应用有没有生产环境」决定的：开发数据域默认只对开发团队（应用成员）开放；
 > 部署开放生产后其他使用者都用 prod，发布者本人在应用有了生产环境后也用 prod。
 > 应用自己判断不了，所以传哨兵 `DYNAMIC_CURRENT_ENV`，由宿主在握手时替你解析成具体值。
 > 写死 `'dev'` 或 `'prod'` 时，如果那不是当前对你开放的数据域，打开会话会被拒绝。
@@ -113,12 +113,12 @@ const caps = await zl.cloud.os.ready();
 数据库 / 文件相关的 profile 或操作符缺失抛 `UNSUPPORTED_OPERATION`；后台执行（`app-execution/1`）缺失抛 `BACKGROUND_CAPABILITY_UNAVAILABLE`（旧 SDK 才是 `UNSUPPORTED_OPERATION`）。
 服务端只在条件满足时下发 profile（`zleap-service/internal/services/cloudauthority/runtime_session.go`）：
 
-| Profile            | 解锁的 API                                                               | 服务端下发条件                                                                                                                           |
-| ------------------ | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `document-core/1`  | `get` / `count` / `add` / `set` / `update` / `remove` / `operations.get` | 数据库已就绪、Manifest 的 `data.collections` 非空、已授予 `cloud.database.read` 或 `write`（`data.schemas` 可选，不写就是灵活集合）      |
-| `watch-snapshot/1` | `watch()`                                                                | 在上一条基础上，声明并授予了 `cloud.database.read`                                                                                       |
-| `storage-object/1` | `uploadFile` / `downloadFile` / `deleteFile` / `os.files.*`              | 部署启用了对象存储、授予了 `cloud.storage.read` 或 `write`；生产数据域还要求当前安装绑定了已就绪的签名发布                               |
-| `app-execution/1`  | `callFunction` / `os.capabilities` / `os.jobs`                           | 当前安装有已启用的后台能力授权（在应用窗口「权限」里勾选了后台能力；`appid` 应用的发布绑定由平台自动完成，旧 `app_key` 应用还需「激活开发」）；缺失时抛 `BACKGROUND_CAPABILITY_UNAVAILABLE` |
+| Profile            | 解锁的 API                                                               | 服务端下发条件                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `document-core/1`  | `get` / `count` / `add` / `set` / `update` / `remove` / `operations.get` | 数据库已就绪、Manifest 的 `data.collections` 非空、已授予 `cloud.database.read` 或 `write`（`data.schemas` 可选，不写就是灵活集合）        |
+| `watch-snapshot/1` | `watch()`                                                                | 在上一条基础上，声明并授予了 `cloud.database.read`                                                                                         |
+| `storage-object/1` | `uploadFile` / `downloadFile` / `deleteFile` / `os.files.*`              | 部署启用了对象存储、授予了 `cloud.storage.read` 或 `write`；生产数据域还要求当前安装绑定了已就绪的签名发布                                 |
+| `app-execution/1`  | `callFunction` / `os.capabilities` / `os.jobs`                           | 当前安装有已启用的后台能力授权（在应用窗口「权限」里勾选了后台能力；发布绑定由平台自动完成）；缺失时抛 `BACKGROUND_CAPABILITY_UNAVAILABLE` |
 
 ```js
 const { profiles } = await zl.cloud.os.ready();
@@ -612,9 +612,9 @@ async function saveTodo(data) {
 }
 ```
 
-> **激活新发布后的会话失效**（提示）
+> **绑定新发布后的会话失效**（提示）
 >
-> 开发者「激活」新的发布候选后，旧会话会收到 `RELEASE_UNAVAILABLE`。宿主会自动重开会话并**重试一次**，
+> 安装切换到另一个版本并绑定新的发布后，旧会话会收到 `RELEASE_UNAVAILABLE`。宿主会自动重开会话并**重试一次**，
 > 多数情况下应用无感。若仍失败，请用户重新打开应用。
 
 ## 后台执行与能力调用

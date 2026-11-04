@@ -64,28 +64,26 @@ ZIP 根目录还必须有 `index.html`（入口）和**非空的 `LICENSE` 文�
 
 ## 顶层字段
 
-| 字段            | 必填 | 类型   | 说明                                                                       |
-| --------------- | ---- | ------ | -------------------------------------------------------------------------- |
-| `schema`        | ✅   | 字符串 | 固定为 `"zleap.app/2"`，其他值会直接被拒绝                                 |
-| `appid`         | ✅   | 字符串 | 应用唯一标识，在云开发控制台「创建应用」后由平台生成，见下方说明           |
-| `app_key`       |      | 字符串 | **旧写法**，仅已有应用继续使用，见下方 [旧写法 `app_key`](#旧写法-app-key) |
-| `name`          | ✅   | 字符串 | 显示名，1–128 位，**必须有可见字符**                                       |
-| `version`       | ✅   | 字符串 | 语义化版本（SemVer），≤32 位，如 `1.0.0`、`1.2.0-beta.1`                   |
-| `publisher`     |      | 对象   | 不再需要；`appid` 应用会忽略它，见下方说明                                 |
-| `description`   |      | 字符串 | ≤2000 位                                                                   |
-| `icon`          |      | 字符串 | ≤512 位                                                                    |
-| `execution`     | ✅   | 枚举   | `foreground` / `headless` / `both`，必须与 `runtime` 一致                  |
-| `runtime`       | ✅   | 对象   | 运行环境声明（见下）                                                       |
-| `background`    |      | 对象   | 后台运行模式，默认 `{ "on_install": "disabled", "modes": [] }`             |
-| `triggers`      |      | 对象   | 触发器声明，默认 `{ "scheduled": [], "events": [] }`                       |
-| `events`        |      | 对象   | 事件发布与订阅，默认 `{ "publishes": [], "subscribes": [] }`               |
-| `data`          |      | 对象   | 数据集合、集合 Schema 与访问规则（见下）                                   |
-| `resources`     |      | 对象   | 资源限制，默认 `{ "max_concurrency": 1 }`                                  |
-| `host_api`      |      | 对象   | 宿主能力声明，默认 `{ "profile": "app-runtime/2", "requires": [] }`        |
-| `agent`         |      | 对象   | Agent 交互声明                                                             |
-| `capabilities`  |      | 数组   | 只能是 `["notify.send"]`（应用通知，见下）                                 |
-| `notifications` |      | 对象   | 通知频道声明（见下）                                                       |
-| `storage`       |      | 对象   | 宿主 KV / 数据空间声明（见下）                                             |
+| 字段            | 必填 | 类型   | 说明                                                                |
+| --------------- | ---- | ------ | ------------------------------------------------------------------- |
+| `schema`        | ✅   | 字符串 | 固定为 `"zleap.app/2"`，其他值会直接被拒绝                          |
+| `appid`         | ✅   | 字符串 | 应用唯一标识，在云开发控制台「创建应用」后由平台生成，见下方说明    |
+| `name`          | ✅   | 字符串 | 显示名，1–128 位，**必须有可见字符**                                |
+| `version`       | ✅   | 字符串 | 语义化版本（SemVer），≤32 位，如 `1.0.0`、`1.2.0-beta.1`            |
+| `description`   |      | 字符串 | ≤2000 位                                                            |
+| `icon`          |      | 字符串 | ≤512 位                                                             |
+| `execution`     | ✅   | 枚举   | `foreground` / `headless` / `both`，必须与 `runtime` 一致           |
+| `runtime`       | ✅   | 对象   | 运行环境声明（见下）                                                |
+| `background`    |      | 对象   | 后台运行模式，默认 `{ "on_install": "disabled", "modes": [] }`      |
+| `triggers`      |      | 对象   | 触发器声明，默认 `{ "scheduled": [], "events": [] }`                |
+| `events`        |      | 对象   | 事件发布与订阅，默认 `{ "publishes": [], "subscribes": [] }`        |
+| `data`          |      | 对象   | 数据集合、集合 Schema 与访问规则（见下）                            |
+| `resources`     |      | 对象   | 资源限制，默认 `{ "max_concurrency": 1 }`                           |
+| `host_api`      |      | 对象   | 宿主能力声明，默认 `{ "profile": "app-runtime/2", "requires": [] }` |
+| `agent`         |      | 对象   | Agent 交互声明                                                      |
+| `capabilities`  |      | 数组   | 只能是 `["notify.send"]`（应用通知，见下）                          |
+| `notifications` |      | 对象   | 通知频道声明（见下）                                                |
+| `storage`       |      | 对象   | 宿主 KV / 数据空间声明（见下）                                      |
 
 ### `appid`
 
@@ -102,37 +100,12 @@ ZIP 根目录还必须有 `index.html`（入口）和**非空的 `LICENSE` 文�
 - `appid` 必须已在控制台创建，否则 40400「appid 不存在」（`detail.reason` 为 `APP_NOT_FOUND`，处理：先在云开发控制台「创建应用」）；
 - 上传者必须是应用成员（管理员或开发者），否则 40300「你不是这个应用的开发者」（`detail.reason` 为 `NOT_APP_MEMBER`，
   处理：请联系应用管理员在云开发控制台「成员」里把你加为开发者），见 [成员管理](console-members.md)；
-- 同时写了 `appid` 和 `app_key` 且两者不同，报 42200「manifest 的 appid 与 app_key 不一致」——只保留 `appid`；
-- 用 `zleap-app` 登录时，开发会话只限定一个 `appid`（`auth login --app-key <appid>`），包里的 `appid` 必须与登录时的一致；
+- 用 `zleap-app` 登录时，开发会话只限定一个 `appid`（`auth login --app-key <appid>`，参数名是 `--app-key`，填的是 `appid`），包里的 `appid` 必须与登录时的一致；
 - 应用被删除后，原 `appid` **不能**再用于上传。
 
-### 旧写法 `app_key`
-
-> **已弃用**（注意）
+> **CLI / 接口回执里的 `app_key`**（提示）
 >
-> `app_key` 命名空间（如 `com.example.todo`）只为**已有应用**保留，新应用请一律用控制台生成的 `appid`。
-
-校验器本身接受 `^[a-z][a-z0-9_.-]*$`，但**上传和运行**还要求它是「发布者命名空间」形式：
-
-- 至少两段，用 `.` 分隔；
-- 每段以小写字母开头，只含小写字母和数字，`-`、`_` 只能夹在字母数字之间；
-- 总长 ≤64。
-
-| 正例                 | 反例                                 |
-| -------------------- | ------------------------------------ |
-| `com.example.todo`   | `mytodo`（没有点）                   |
-| `com.example.my-app` | `Com.Example.Todo`（大写）           |
-| `com.example.my_app` | `com.example.-app`（`-` 不能打头）   |
-| `org.acme.notes2`    | `com.example.2notes`（段以数字开头） |
-
-不满足时报「manifest app_key 必须使用包含发布者前缀的小写命名空间」或
-「第三方应用 app_key 必须包含发布者命名空间」。
-
-旧 `app_key` 应用一经上传就归属第一个上传者（上传过包的人视为该应用的管理员）：
-
-- 其他用户再用同一个 `app_key` 上传会被拒绝（「不能覆盖其他发布者的应用标识」）；
-- 应用被删除后，原 `app_key` **不能**再用于上传；
-- 用 `zleap-app` 登录时，开发会话只限定一个 `app_key`，包里的 `app_key` 必须与登录时的一致。
+> `zleap-app check`、`publish` 等命令与接口回执 JSON 里的 `app_key` 字段就是这里的 `appid`，只是沿用了旧字段名。
 
 ### `version` 与重复上传
 
@@ -142,13 +115,6 @@ ZIP 根目录还必须有 `index.html`（入口）和**非空的 `LICENSE` 文�
 - 同一版本号、**不同内容**会被拒绝：「该版本已经存在，请更换版本号」。
 
 改了任何文件都要升版本号再上传。
-
-### `publisher` 发布者
-
-用 `appid` 的应用**不需要** `publisher`，写了也会被忽略——谁能上传由应用成员决定。
-
-只有旧 `app_key` 应用还会核对它：写了就必须等于上传者本人的用户 ID（字符串），
-否则上传被拒：「发布者声明不属于当前登录用户」。
 
 ### `execution` 必须与运行形态一致
 
@@ -541,7 +507,7 @@ Manifest 校验器接受 `^[a-zA-Z][a-zA-Z0-9_.-]*$`（≤128），但**数据�
 | `on_install` | 只能是 `"disabled"`（默认）                             |
 | `modes`      | 从 `on_demand` / `scheduled` / `events` 中选，最多 3 个 |
 
-安装应用**不会**自动启动后台任务。后台能力要在发布并激活后，由用户在应用窗口「权限」或控制台里单独允许。
+安装应用**不会**自动启动后台任务。后台能力要在安装后由用户在应用窗口「权限」或控制台里单独允许。
 **要用定时触发器，`modes` 必须含 `"scheduled"`；事件触发器要含 `"events"`**，否则启用时报 `TRIGGER_MODE_NOT_DECLARED`。
 
 ## `triggers` — 触发器
