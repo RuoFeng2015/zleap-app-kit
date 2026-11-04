@@ -10,13 +10,15 @@ import { config, copyDir, flag, paths, platformPackageName } from './lib/config.
 
 const check = flag('check');
 const problems = [];
+// 比较时忽略换行风格：Windows 上 git 可能以 CRLF 检出（仓库已用 .gitattributes 固定 LF，这里再兜一层）。
+const lf = (text) => text.replace(/\r\n/g, '\n');
 
 function updateJSON(file, mutate) {
   const before = readFileSync(file, 'utf8');
   const value = JSON.parse(before);
   mutate(value);
   const after = `${JSON.stringify(value, null, 2)}\n`;
-  if (after !== before) {
+  if (after !== lf(before)) {
     problems.push(relative(paths.root, file));
     if (!check) writeFileSync(file, after);
   }
@@ -42,7 +44,7 @@ for (const rel of ['src/cloud/client.ts']) {
   const file = join(paths.template, rel);
   const before = readFileSync(file, 'utf8');
   const after = before.replace(/from '(@[\w-]+\/)?[\w-]*app-sdk'/g, `from '${config.sdkPackage}'`);
-  if (after !== before) {
+  if (lf(after) !== lf(before)) {
     problems.push(relative(paths.root, file));
     if (!check) writeFileSync(file, after);
   }
@@ -68,7 +70,11 @@ const same = (a, b) => {
       .sort();
   const left = list(a);
   const right = list(b);
-  return left.length === right.length && left.every((file, i) => file === right[i] && readFileSync(join(a, file)).equals(readFileSync(join(b, file))));
+  const content = (file) => {
+    const bytes = readFileSync(file);
+    return bytes.includes(0) ? bytes.toString('latin1') : lf(bytes.toString('utf8'));
+  };
+  return left.length === right.length && left.every((file, i) => file === right[i] && content(join(a, file)) === content(join(b, file)));
 };
 for (const name of skillNames) {
   if (!same(join(paths.skills, name), join(bundled, name))) {

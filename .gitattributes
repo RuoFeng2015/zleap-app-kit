@@ -1,0 +1,8 @@
+# 统一用 LF 检出：Windows（core.autocrlf=true，GitHub Actions windows-latest 默认）会把文本转成 CRLF，
+# scripts/sync.mjs --check 逐字节比较 package.json / skills，CRLF 会被误判成「不一致」。
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.tgz binary
+*.zip binary

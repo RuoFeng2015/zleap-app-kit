@@ -87,7 +87,8 @@ function rewriteImages(text) {
 }
 
 function convert(page, files) {
-  const source = readFileSync(join(docs, page), 'utf8').replace(/^---\n[\s\S]*?\n---\n/, '');
+  // 先统一成 LF：Windows 上文档站或 skills 可能以 CRLF 检出
+  const source = readFileSync(join(docs, page), 'utf8').replace(/\r\n/g, '\n').replace(/^---\n[\s\S]*?\n---\n/, '');
   const body = rewriteLinks(rewriteContainers(rewriteImages(source)), files);
   return `<!-- 由 zleap-app-kit/scripts/sync-skill-references.mjs 从云开发文档站 ${page} 生成，请改文档站后重新同步 -->\n\n${body.trim()}\n`;
 }
@@ -103,7 +104,7 @@ for (const [skill, files] of Object.entries(MAP)) {
   const expected = Object.fromEntries(Object.entries(files).map(([ref, page]) => [ref, convert(page, files)]));
   for (const [ref, content] of Object.entries(expected)) {
     const file = join(dir, ref);
-    if (!existsSync(file) || readFileSync(file, 'utf8') !== content) drift.push(`${skill}/${ref}`);
+    if (!existsSync(file) || readFileSync(file, 'utf8').replace(/\r\n/g, '\n') !== content) drift.push(`${skill}/${ref}`);
   }
   const extra = existsSync(dir) ? readdirSync(dir).filter((name) => !(name in expected)) : [];
   drift.push(...extra.map((name) => `${skill}/${name}（多余）`));
