@@ -29,7 +29,6 @@ const MAP = {
   'zleap-cloud-app-release': {
     'dev-to-production.md': 'guide/dev-to-production.md',
     'console-release.md': 'console/release.md',
-    'console-legacy-release.md': 'console/legacy-release.md',
     'console-functions.md': 'console/functions.md',
     'console-workspace.md': 'console/workspace.md',
     'console-members.md': 'console/members.md',

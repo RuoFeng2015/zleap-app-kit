@@ -7,7 +7,7 @@ zleapOS 云开发应用的一站式工具：
 | `create-zleap-app` | 脚手架：生成 React + TypeScript + Vite 云开发应用，自带 Cloud SDK、部署脚本、AGENTS.md 和 skills | `npm create zleap-app@latest my-app` |
 | `@zleap-ai/app-cli` | `zleap-app` CLI 的 npm 发行版（按平台自动选用预编译二进制，无需 Go） | 脚手架已作为 devDependency；也可 `npx @zleap-ai/app-cli` |
 | `@zleap-ai/app-sdk` | 前端 SDK：Cloud 数据库 / 文件 / 云函数（`zl.cloud`）、宿主能力（`/host`）、工作区（`/workspace`）。压缩混淆发布，类型声明可读，专有许可 | 脚手架已作为依赖；也可 `npm i @zleap-ai/app-sdk` |
-| `skills/` | 给 AI 编程工具的 skills：`zleap-cloud-app`（开发/调试/部署）、`zleap-cloud-app-release`（签名激活/生产/分享/版本） | 脚手架项目自带；已有项目 `npx create-zleap-app@latest skills` |
+| `skills/` | 给 AI 编程工具的 skills：`zleap-cloud-app`（开发/调试/部署）、`zleap-cloud-app-release`（云函数/发布上线/分享/版本） | 脚手架项目自带；已有项目 `npx create-zleap-app@latest skills` |
 
 ## 给应用开发者
 
