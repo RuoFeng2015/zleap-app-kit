@@ -267,7 +267,7 @@ function finish(appId, installed, diagnosis = null) {
   if (installed) steps.push('从 zleapOS 启动台打开应用（已打开的窗口点「重新加载应用」）。');
   if (hasBackgroundCapabilities(readJSON(manifestFile, {})) && diagnosis?.resource_preparation_required) {
     steps.push(
-      `有云函数 / 后台能力：npx zleap-app prepare ${appId} --version-id ${readJSON(stateFile, {}).versionId ?? '<version_id>'} 签名并激活到开发环境（或在「云开发控制台」→ 版本管理下方「开发环境：云函数激活」操作），再在应用窗口「权限」里允许后台能力。`,
+      `有云函数 / 后台能力：npx zleap-app prepare ${appId} --version-id ${readJSON(stateFile, {}).versionId ?? '<version_id>'} 补做开发环境准备（平台上传时通常已自动签名并绑定，只有自动签名失败时才会走到这一步），再在应用窗口「权限」里允许后台能力。`,
     );
   }
   if (!cloud || !cloud.dev || !cloud.databaseReady) {
