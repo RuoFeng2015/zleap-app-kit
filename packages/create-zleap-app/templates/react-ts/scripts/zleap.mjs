@@ -212,6 +212,14 @@ async function deploy() {
   const packageId = id(pack.id);
   if (!appId || !versionId) throw new StepError(`上传回执缺少 app_id / version_id：${published.stdout}`);
   ok(`已上传 v${report.version}：app_id=${appId} version_id=${versionId} package_id=${packageId}`);
+  // 平台 appid 应用：带云函数 / 后台能力的版本上传后平台自动签名；签不上时回执带原因（旧平台没有这个字段）。
+  const autoSign = published.json?.result?.auto_sign;
+  if (autoSign?.status === 'failed') {
+    warn(
+      `平台自动签名失败（${autoSign.reason ?? '未知原因'}）：云函数 / 后台能力暂时不可用。打开应用或切换版本时平台会自动重试；` +
+        `也可以运行 npx zleap-app prepare ${appId} --version-id ${versionId} 查看详细错误。`,
+    );
+  }
   writeJSON(stateFile, { appId, versionId, packageId, version: report.version, digest: report.digest, at: new Date().toISOString() });
 
   if (has('no-install')) return finish(appId, false);

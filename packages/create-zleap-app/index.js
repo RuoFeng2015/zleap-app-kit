@@ -118,6 +118,9 @@ async function main() {
     const nameProblem = validateName(name);
     if (nameProblem) throw new Error(nameProblem);
     rl?.close();
+    // 发布时应用名以 manifest.json 的 name 为准：非交互又没给 --name 时，名字是目录名，发布后控制台里的应用名会被改掉。
+    if (!options.name && !rl)
+      console.log(red(`! 没有提供 --name，应用名称暂用目录名「${name}」。发布时应用名以 manifest.json 的 name 为准，请改成控制台里的应用名（或重新生成时加 --name "应用名"）`));
 
     console.log(`\n在 ${cyan(targetDir)} 创建 ${bold(name)}（${appid}）`);
     scaffold({
