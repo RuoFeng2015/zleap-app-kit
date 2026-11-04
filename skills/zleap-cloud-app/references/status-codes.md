@@ -145,15 +145,15 @@
 
 ### 数据
 
-| 错误码                 | 含义                                       | 处理                                                        |
-| ---------------------- | ------------------------------------------ | ----------------------------------------------------------- |
-| `SCHEMA_INVALID`       | 参数或文档不符合规则（含大小、嵌套等超限） | 见本页末尾「排查：`SCHEMA_INVALID`」                        |
-| `VERSION_CONFLICT`     | 乐观锁冲突，或键已存在等 409 类错误        | 重新读取最新版本再改                                        |
-| `DOCUMENT_NOT_FOUND`   | 文档不存在（或 404 类错误）                | 检查文档键；读取时可用 `throwOnNotFound: false`             |
-| `COLLECTION_NOT_FOUND` | 集合不存在                                 | 在 Manifest `data.collections` 声明；生产环境要单独开通集合 |
+| 错误码                 | 含义                                         | 处理                                                                             |
+| ---------------------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `SCHEMA_INVALID`       | 参数或文档不符合规则（含大小、嵌套等超限）   | 见本页末尾「排查：`SCHEMA_INVALID`」                                             |
+| `VERSION_CONFLICT`     | 乐观锁冲突，或键已存在等 409 类错误          | 重新读取最新版本再改                                                             |
+| `DOCUMENT_NOT_FOUND`   | 文档不存在（或 404 类错误）                  | 检查文档键；读取时可用 `throwOnNotFound: false`                                  |
+| `COLLECTION_NOT_FOUND` | 集合不存在                                   | 在 Manifest `data.collections` 声明；生产环境要单独开通集合                      |
 | `SCOPE_FORBIDDEN`      | 读写了 manifest **没声明**的集合（或没授权） | 先在 `data.collections` 声明再部署；已声明还报这个，看「权限」里是否勾了数据读写 |
-| `INDEX_REQUIRED`       | 查询需要扫描的行数超过单次上限             | 给筛选字段建索引；已有索引仍超限时缩小筛选范围              |
-| `RESOURCE_NOT_READY`   | 云数据库正在开通，或数据服务还没加载本应用 | 通常一分钟内自动就绪，稍后刷新重试                          |
+| `INDEX_REQUIRED`       | 查询需要扫描的行数超过单次上限               | 给筛选字段建索引；已有索引仍超限时缩小筛选范围                                   |
+| `RESOURCE_NOT_READY`   | 云数据库正在开通，或数据服务还没加载本应用   | 通常一分钟内自动就绪，稍后刷新重试                                               |
 
 ### 文件存储
 
@@ -524,18 +524,18 @@
 平台在上传带后台能力的版本时自动签发开发发布，首次发布为线上版本时自动签发生产发布。
 签发或验签失败时按原因码归类返回：
 
-| 服务端原因码                                                                      | 含义                                                                     |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `RELEASE_PROOF_TOO_LARGE`                                                         | 证明文件超过 2 MiB 限制                                                  |
-| `RELEASE_PROOF_INVALID`                                                           | 证明 JSON 或签名信封无效                                                 |
-| `RELEASE_IDENTITY_MISMATCH`、`RELEASE_DIGEST_MISMATCH`、`RELEASE_SOURCE_MISMATCH` | 证明与当前应用、发布、包、来源、摘要或策略不匹配                         |
-| `RELEASE_SIGNATURE_INVALID`                                                       | 无法验证发布签名                                                         |
-| `RELEASE_ARTIFACT_MISMATCH`、`RELEASE_MANIFEST_MISMATCH`                          | 签名 Manifest 或包制品清单不匹配                                         |
-| `RELEASE_POLICY_STALE`                                                            | 策略审核已过期或不是当前策略                                             |
-| `RELEASE_POLICY_UNAVAILABLE`                                                      | 尚未配置发布策略，无法验证                                               |
-| `RELEASE_TRUST_UNAVAILABLE`                                                       | 发布信任策略尚未配置，或发布者密钥不可用、已撤销或已过期；由管理员检查   |
-| `RELEASE_DISABLED`                                                                | 发布候选已撤回                                                           |
-| 其他                                                                              | 签名验证请求被拒绝                                                       |
+| 服务端原因码                                                                      | 含义                                                                   |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `RELEASE_PROOF_TOO_LARGE`                                                         | 证明文件超过 2 MiB 限制                                                |
+| `RELEASE_PROOF_INVALID`                                                           | 证明 JSON 或签名信封无效                                               |
+| `RELEASE_IDENTITY_MISMATCH`、`RELEASE_DIGEST_MISMATCH`、`RELEASE_SOURCE_MISMATCH` | 证明与当前应用、发布、包、来源、摘要或策略不匹配                       |
+| `RELEASE_SIGNATURE_INVALID`                                                       | 无法验证发布签名                                                       |
+| `RELEASE_ARTIFACT_MISMATCH`、`RELEASE_MANIFEST_MISMATCH`                          | 签名 Manifest 或包制品清单不匹配                                       |
+| `RELEASE_POLICY_STALE`                                                            | 策略审核已过期或不是当前策略                                           |
+| `RELEASE_POLICY_UNAVAILABLE`                                                      | 尚未配置发布策略，无法验证                                             |
+| `RELEASE_TRUST_UNAVAILABLE`                                                       | 发布信任策略尚未配置，或发布者密钥不可用、已撤销或已过期；由管理员检查 |
+| `RELEASE_DISABLED`                                                                | 发布候选已撤回                                                         |
+| 其他                                                                              | 签名验证请求被拒绝                                                     |
 
 签发时的 `RELEASE_POLICY_UNAVAILABLE`、`RELEASE_TRUST_UNAVAILABLE` 属于**部署未配置**；
 发布生产版本时的 `RELEASE_TRUST_UNAVAILABLE` 则表示这个发布的签名与当前信任策略对不上，重新发布即可（见 [发布与生产门禁](#发布与生产门禁)）。

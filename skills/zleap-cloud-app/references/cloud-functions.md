@@ -284,7 +284,12 @@ await zl.cloud.os.database.mutate({
 `document._version` 是写入后的版本号，下次 `update` / `remove` 时作为 `expected_version` 传回去。
 
 ```js
-const saved = await zl.cloud.os.database.mutate({ collection: 'drafts', operation: 'add', data, request_id: `${context.invocationId}:add` });
+const saved = await zl.cloud.os.database.mutate({
+  collection: 'drafts',
+  operation: 'add',
+  data,
+  request_id: `${context.invocationId}:add`,
+});
 return { id: saved.document._id, version: saved.document._version };
 ```
 
@@ -664,11 +669,11 @@ console.log(job.result);
 
 ### 其他作业 API
 
-| API                                                                                  | 说明                                                                                                                              |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `jobs.wait({ jobId, timeoutSeconds?, pollMilliseconds? })`                           | 等到终态；`timeoutSeconds` 0–300（默认 25），`pollMilliseconds` 100–5000（默认 500）；超时仍未结束抛 `CALL_TIMEOUT`（带 `jobId`） |
-| `jobs.get({ jobId })` / `jobs.result({ jobId })`                                     | 读一次当前状态                                                                                                                    |
-| `jobs.submit({ kind: 'capability', capability, input, operationId?, waitSeconds? })` | 与 `capabilities.invoke` 等价的另一种写法                                                                                         |
+| API                                                                                  | 说明                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jobs.wait({ jobId, timeoutSeconds?, pollMilliseconds? })`                           | 等到终态；`timeoutSeconds` 0–300（默认 25），`pollMilliseconds` 100–5000（默认 500）；超时仍未结束抛 `CALL_TIMEOUT`（带 `jobId`）                                                         |
+| `jobs.get({ jobId })` / `jobs.result({ jobId })`                                     | 读一次当前状态                                                                                                                                                                            |
+| `jobs.submit({ kind: 'capability', capability, input, operationId?, waitSeconds? })` | 与 `capabilities.invoke` 等价的另一种写法                                                                                                                                                 |
 | `jobs.cancel({ jobId })`                                                             | 请求取消，返回 `{ cancelRequested: true }`。排队中或函数还没开始写数据时，作业以 `cancelled` 结束；正在执行的函数会被立即停止，结果为 `cancelled`。**取消不是回滚**：已提交的写入不会撤销 |
 
 同一个 `operationId` 再次提交、输入相同 → 返回原作业；输入不同 → 冲突「同一操作编号的输入不同」。
