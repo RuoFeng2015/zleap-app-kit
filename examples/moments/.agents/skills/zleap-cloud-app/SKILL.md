@@ -51,7 +51,7 @@ manifest 里写 `"appid": "<appid>"`，**不需要** `app_key` 和 `publisher`�
 2. **权限**：需要的能力加进 `requires`（`cloud.database.read/write`、`cloud.storage.read/write`、`os.agent.complete` 等，白名单外的非可选能力会让应用「暂不可用」）。`reason` 会展示给用户，写具体用途。
 3. **数据层**：React 模板在 `src/cloud/` 下按集合写一个模块（参照 `src/cloud/todos.ts`），组件只调用这些函数；错误用 `describeError()` 展示。
 4. **本地验证**：`npm run typecheck && npm run check`（`check` 通过只代表静态契约，`runtime_test=not_checked`）。
-5. **部署到自己桌面**：`npm run deploy`（构建 → 检查 → 上传 private → 安装/切换本人安装；内容变化时自动递增补丁号）。
+5. **部署到自己桌面**：`npm run deploy`（构建 → 检查 → 上传开发版本（appid 应用仅成员可见）→ 安装/切换本人安装；内容变化时自动递增补丁号）。
    - 报未登录/会话过期 → 请用户运行 `npm run login -- --target <OS 地址>` 并在浏览器核对确认码。
    - 报 `DATA_MIGRATION_REQUIRED` → 新版本改了 data/storage 声明，见第 5 节。
 6. **请用户验收**：安装时平台会自动创建开发环境、开通数据库并按声明建集合，`npm run deploy` 结束时会打印状态；显示未就绪时，请用户在「云开发控制台」选中应用 →「概览」按提示处理。然后从启动台打开应用（已打开的点「重新加载应用」）。
@@ -67,8 +67,8 @@ manifest 里写 `"appid": "<appid>"`，**不需要** `app_key` 和 `publisher`�
   再在**按钮点击事件里**调用 `zl.auth.authorize({ scopes: ['profile' | 'phone' | 'email'], reason: '用途说明' })`（不在点击里调用 `AUTH_GESTURE_REQUIRED`），
   返回 `{ openid, scopes, profile?, phone?, email? }`——用户可以只勾选一部分、没绑定的不返回，**以 `scopes` 判断拿到了什么**；
   拒绝时 `AUTH_DENIED`（拒绝过的项 24 小时内不再弹框，直接 `AUTH_DENIED`）。`zl.auth.getIdentity()` 静默拿 `openid`（每个应用不同、开发与线上一致）。
-  云函数里用 `zl.cloud.auth.getOpenId()` / `getUserInfo()`；不要用 `getContext().userId`（平台内部 ID，已废弃）。
-  不要自己做登录页或索要账号；云函数里目前读不到授权信息。
+  云函数里**没有** `zl.cloud.auth`（`getOpenId()` / `getUserInfo()` 都不可用）：需要 openid 时由页面 `getIdentity()` 取到后作为输入传给函数，或用文档自带的 `_openid`；不要用 `getContext().userId`（平台内部 ID，已废弃）。
+  不要自己做登录页或索要账号；云函数里读不到授权信息。
 - 都从 `@zleap-ai/app-sdk` 导入（`import { zl, AppError } from '@zleap-ai/app-sdk'`），完整说明见 references/app-runtime.md。
 
 ## 4. 只有用户能做的事（明确告诉用户，不要假装已完成）
