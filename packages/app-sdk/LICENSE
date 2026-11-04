@@ -1,0 +1,24 @@
+zleapOS App SDK License
+
+Copyright (c) 2026 Zleap. All rights reserved.
+
+This package ("the SDK") is proprietary software provided by Zleap.
+
+1. Permitted use. You may install the SDK and include it, unmodified, in
+   applications that run on zleapOS (including applications you distribute to
+   others through zleapOS), solely to access zleapOS platform capabilities.
+
+2. Restrictions. Except as expressly permitted above, you may not copy, modify,
+   merge, publish, sublicense, sell or otherwise distribute the SDK on its own;
+   reverse engineer, decompile or attempt to derive its source code, except to
+   the extent applicable law expressly permits this despite this limitation; or
+   use the SDK to access services other than zleapOS.
+
+3. The TypeScript declaration files under dist/types may be read and used for
+   development tooling (editors, type checking, AI coding assistants).
+
+4. No warranty. THE SDK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED. IN NO EVENT SHALL ZLEAP BE LIABLE FOR ANY CLAIM, DAMAGES
+   OR OTHER LIABILITY ARISING FROM THE USE OF THE SDK.
+
+All rights not expressly granted are reserved by Zleap.

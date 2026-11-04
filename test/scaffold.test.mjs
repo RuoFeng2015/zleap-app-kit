@@ -1,0 +1,136 @@
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+import {
+  detectPackageManager,
+  installSkills,
+  isEmptyDir,
+  nodeVersionProblem,
+  parseArgs,
+  scaffold,
+  toAppKeySegment,
+  toPackageName,
+  validateAppId,
+  validateAppKey,
+  validateName,
+} from '../packages/create-zleap-app/lib/scaffold.js';
+
+const root = fileURLToPath(new URL('..', import.meta.url));
+const templateDir = join(root, 'packages/create-zleap-app/templates/react-ts');
+
+test('app_key 校验与服务端规则一致', () => {
+  for (const ok of ['com.example.todo', 'com.example.my-app', 'com.example.my_app', 'org.acme.notes2']) {
+    assert.equal(validateAppKey(ok), null, ok);
+  }
+  for (const bad of ['', 'mytodo', 'Com.Example.Todo', 'com.example.-app', 'com.example.2notes', `com.${'a'.repeat(70)}`]) {
+    assert.notEqual(validateAppKey(bad), null, bad);
+  }
+});
+
+test('appid：平台 appid 优先，旧命名空间仍可用', () => {
+  for (const ok of ['zl3f9a2c7e1b0d4a68', 'com.example.todo']) assert.equal(validateAppId(ok), null, ok);
+  for (const bad of ['', 'zl3f9a2c7e1b0d4a6', 'ZL3F9A2C7E1B0D4A68', 'mytodo']) assert.notEqual(validateAppId(bad), null, bad);
+});
+
+test('名称与目录推导', () => {
+  assert.equal(validateName('  '), '应用名称不能为空');
+  assert.equal(toPackageName('/tmp/My App!'), 'my-app');
+  assert.equal(toAppKeySegment('/tmp/2nd Todo'), 'nd-todo');
+  assert.equal(toAppKeySegment('/tmp/123'), 'app');
+});
+
+test('参数解析', () => {
+  const parsed = parseArgs(['demo', '--appid=zl3f9a2c7e1b0d4a68', '--name', '演示', '--no-install', '-y', '--pm', 'pnpm']);
+  assert.equal(parsed.dir, 'demo');
+  assert.equal(parsed.appid, 'zl3f9a2c7e1b0d4a68');
+  assert.equal(parseArgs(['--app-key', 'com.a.b']).appid, 'com.a.b', '旧参数名等价于 --appid');
+  assert.equal(parsed.name, '演示');
+  assert.equal(parsed.install, false);
+  assert.equal(parsed.yes, true);
+  assert.equal(parsed.pm, 'pnpm');
+  assert.throws(() => parseArgs(['--bogus']), /未知参数/);
+});
+
+test('包管理器跟随调用方', () => {
+  assert.equal(detectPackageManager('pnpm/9.0.0 npm/? node/v22'), 'pnpm');
+  assert.equal(detectPackageManager('yarn/4.0.0'), 'yarn');
+  assert.equal(detectPackageManager(''), 'npm');
+});
+
+test('生成项目：占位符全部替换，JSON/HTML 正确转义，skills 装到两个目录', () => {
+  const dir = join(mkdtempSync(join(tmpdir(), 'zleap-scaffold-')), 'app');
+  assert.equal(isEmptyDir(dir), true);
+  scaffold({
+    templateDir,
+    targetDir: dir,
+    appid: 'zl3f9a2c7e1b0d4a68',
+    name: '带"引号"<和尖括号>',
+    packageName: 'app',
+    cliPackage: '@zleap-ai/app-cli',
+    cliVersion: '0.10.0',
+    sdkPackage: '@zleap-ai/app-sdk',
+    sdkVersion: '0.10.0',
+    year: 2026,
+  });
+  const manifest = JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8'));
+  assert.equal(manifest.appid, 'zl3f9a2c7e1b0d4a68');
+  assert.equal(manifest.app_key, undefined, '新项目只写 appid');
+  assert.equal(manifest.publisher, undefined, '不再需要 publisher');
+  assert.equal(manifest.name, '带"引号"<和尖括号>');
+  const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  assert.equal(pkg.name, 'app');
+  assert.equal(pkg.devDependencies['@zleap-ai/app-cli'], '^0.10.0');
+  assert.match(readFileSync(join(dir, 'index.html'), 'utf8'), /<title>带&quot;引号&quot;&lt;和尖括号&gt;<\/title>/);
+  assert.match(readFileSync(join(dir, 'LICENSE'), 'utf8'), /Copyright \(c\) 2026/);
+  assert.ok(existsSync(join(dir, '.gitignore')));
+  assert.ok(!existsSync(join(dir, '_gitignore')));
+  assert.equal(pkg.dependencies['@zleap-ai/app-sdk'], '^0.10.0');
+  assert.ok(!existsSync(join(dir, 'src/zleap-sdk')), '可读 SDK 不应再随模板分发');
+  assert.match(readFileSync(join(dir, 'src/cloud/client.ts'), 'utf8'), /from '@zleap-ai\/app-sdk'/);
+  for (const file of ['package.json', 'manifest.json', 'index.html', 'README.md', 'AGENTS.md', 'LICENSE', 'src/App.tsx']) {
+    assert.doesNotMatch(readFileSync(join(dir, file), 'utf8'), /__[A-Z_]+__/, file);
+  }
+  assert.equal(isEmptyDir(dir), false);
+
+  const names = installSkills({ skillsDir: join(root, 'skills'), targetDir: dir });
+  assert.deepEqual(names.sort(), ['zleap-cloud-app', 'zleap-cloud-app-release']);
+  for (const target of ['.agents/skills', '.claude/skills']) {
+    assert.deepEqual(readdirSync(join(dir, target)).sort(), names);
+    assert.ok(existsSync(join(dir, target, 'zleap-cloud-app/references/manifest.md')));
+  }
+});
+
+test('模板 manifest 是合法的 zleap.app/2 最小应用', () => {
+  const raw = readFileSync(join(templateDir, 'manifest.json'), 'utf8');
+  const manifest = JSON.parse(raw);
+  assert.equal(manifest.schema, 'zleap.app/2');
+  assert.equal(manifest.execution, 'foreground');
+  assert.equal(manifest.runtime.ui.entry, 'index.html');
+  assert.deepEqual(manifest.data.collections, ['todos']);
+  assert.equal(manifest.data.schemas.todos.additionalProperties, false);
+});
+
+test('Node.js 版本：与生成项目的 Vite 7 要求一致', () => {
+  for (const ok of ['20.19.0', '20.20.1', '22.12.0', '22.21.1', '24.11.0', 'v26.0.0']) assert.equal(nodeVersionProblem(ok), null, ok);
+  for (const bad of ['18.20.4', '20.18.3', '21.7.3', '22.11.0']) assert.match(nodeVersionProblem(bad), /20\.19\+ 或 22\.12\+/, bad);
+  const engines = JSON.parse(readFileSync(join(templateDir, 'package.json'), 'utf8')).engines?.node;
+  assert.equal(engines, '^20.19.0 || >=22.12.0');
+});
+
+test('skills 子命令：给已有项目补装 skills，不动其他文件', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'zleap-skills-'));
+  const result = spawnSync(process.execPath, [join(root, 'packages/create-zleap-app/index.js'), 'skills', dir], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  for (const target of ['.agents/skills', '.claude/skills']) {
+    assert.ok(existsSync(join(dir, target, 'zleap-cloud-app', 'SKILL.md')), target);
+    assert.ok(existsSync(join(dir, target, 'zleap-cloud-app-release', 'SKILL.md')), target);
+  }
+  assert.deepEqual(readdirSync(dir).sort(), ['.agents', '.claude']);
+  const missing = spawnSync(process.execPath, [join(root, 'packages/create-zleap-app/index.js'), 'skills', join(dir, 'nope')], { encoding: 'utf8' });
+  assert.notEqual(missing.status, 0);
+});

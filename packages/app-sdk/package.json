@@ -1,0 +1,44 @@
+{
+  "name": "@zleap-ai/app-sdk",
+  "version": "0.10.0",
+  "description": "zleapOS 云开发前端 SDK：Cloud 数据库 / 文件 / 云函数（zl.cloud）、宿主能力（connectHostedApp）与工作区连接",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zleap-ai/zleap-app-kit.git",
+    "directory": "packages/app-sdk"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./host": {
+      "types": "./dist/types/zleap-sdk.d.ts",
+      "import": "./dist/host.js",
+      "default": "./dist/host.js"
+    },
+    "./workspace": {
+      "types": "./dist/types/workspace.d.ts",
+      "import": "./dist/workspace.js",
+      "default": "./dist/workspace.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "keywords": [
+    "zleap",
+    "zleapos",
+    "app-cloud",
+    "sdk"
+  ]
+}

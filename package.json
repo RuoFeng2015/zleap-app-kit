@@ -1,0 +1,24 @@
+{
+  "name": "zleap-app-kit",
+  "private": true,
+  "version": "0.10.0",
+  "description": "zleapOS 云开发应用工具集：npx 脚手架 create-zleap-app、CLI npm 分发 @zleap-ai/app-cli、前端 SDK @zleap-ai/app-sdk、AI 编程工具 skills",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "build:sdk": "node scripts/build-sdk.mjs",
+    "sync:refs": "node scripts/sync-skill-references.mjs",
+    "build:cli": "node scripts/build-cli.mjs",
+    "check": "node scripts/sync.mjs --check",
+    "test": "node --test test/*.test.mjs",
+    "release:dry": "node scripts/publish.mjs --dry-run",
+    "release": "node scripts/publish.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12"
+  }
+}

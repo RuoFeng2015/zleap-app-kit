@@ -1,0 +1,50 @@
+{
+  "$comment": "发布坐标集中在这里。改名只改这一个文件，然后运行 npm run sync。",
+  "version": "0.10.0",
+  "$commentCreateVersion": "create-zleap-app 是不带 scope 的独立包，版本与 CLI/SDK 解耦：CLI/SDK/平台子包不重编时单独递增它即可。",
+  "createVersion": "0.10.2",
+  "npmScope": "@zleap-ai",
+  "cliPackage": "@zleap-ai/app-cli",
+  "sdkPackage": "@zleap-ai/app-sdk",
+  "createPackage": "create-zleap-app",
+  "skillsRepo": "zleap-ai/zleap-app-kit",
+  "repositoryUrl": "https://github.com/zleap-ai/zleap-app-kit",
+  "platforms": [
+    {
+      "os": "darwin",
+      "cpu": "arm64",
+      "goos": "darwin",
+      "goarch": "arm64"
+    },
+    {
+      "os": "darwin",
+      "cpu": "x64",
+      "goos": "darwin",
+      "goarch": "amd64"
+    },
+    {
+      "os": "linux",
+      "cpu": "x64",
+      "goos": "linux",
+      "goarch": "amd64"
+    },
+    {
+      "os": "linux",
+      "cpu": "arm64",
+      "goos": "linux",
+      "goarch": "arm64"
+    },
+    {
+      "os": "win32",
+      "cpu": "x64",
+      "goos": "windows",
+      "goarch": "amd64"
+    },
+    {
+      "os": "win32",
+      "cpu": "arm64",
+      "goos": "windows",
+      "goarch": "arm64"
+    }
+  ]
+}

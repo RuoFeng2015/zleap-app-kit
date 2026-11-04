@@ -1,0 +1,41 @@
+{
+  "name": "create-zleap-app",
+  "version": "0.10.2",
+  "description": "一条命令创建 zleapOS 云开发应用（React + TypeScript + Vite），并为 Codex / Claude Code / Pi / OpenCode / Cursor 等 AI 编程工具配好 skills",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zleap-ai/zleap-app-kit.git",
+    "directory": "packages/create-zleap-app"
+  },
+  "type": "module",
+  "bin": {
+    "create-zleap-app": "index.js"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "templates",
+    "skills"
+  ],
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "zleapKit": {
+    "cliPackage": "@zleap-ai/app-cli",
+    "cliVersion": "0.10.0",
+    "sdkPackage": "@zleap-ai/app-sdk",
+    "sdkVersion": "0.10.0",
+    "skillsRepo": "zleap-ai/zleap-app-kit"
+  },
+  "keywords": [
+    "zleap",
+    "zleapos",
+    "app-cloud",
+    "create",
+    "scaffold",
+    "react",
+    "vite",
+    "agent-skills"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "__PKG_NAME__",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "check": "npm run build && zleap-app check dist",
+    "pack:zip": "npm run build && zleap-app pack dist --output out/app.zip",
+    "login": "node scripts/zleap.mjs login",
+    "deploy": "node scripts/zleap.mjs deploy",
+    "status": "node scripts/zleap.mjs status",
+    "logs": "node scripts/zleap.mjs logs",
+    "versions": "node scripts/zleap.mjs versions",
+    "release": "node scripts/zleap.mjs release"
+  },
+  "dependencies": {
+    "__SDK_PACKAGE__": "^__SDK_VERSION__",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "__CLI_PACKAGE__": "^__CLI_VERSION__",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.0"
+  }
+}

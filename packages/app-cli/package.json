@@ -1,0 +1,39 @@
+{
+  "name": "@zleap-ai/app-cli",
+  "version": "0.10.0",
+  "description": "zleapOS 云开发命令行工具 zleap-app（init / check / pack / publish / install / prepare / test / MCP），按平台自动选用预编译二进制",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zleap-ai/zleap-app-kit.git",
+    "directory": "packages/app-cli"
+  },
+  "type": "commonjs",
+  "bin": {
+    "zleap-app": "bin/zleap-app.js"
+  },
+  "main": "lib/resolve.js",
+  "files": [
+    "bin",
+    "lib",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@zleap-ai/app-cli-darwin-arm64": "0.10.0",
+    "@zleap-ai/app-cli-darwin-x64": "0.10.0",
+    "@zleap-ai/app-cli-linux-x64": "0.10.0",
+    "@zleap-ai/app-cli-linux-arm64": "0.10.0",
+    "@zleap-ai/app-cli-win32-x64": "0.10.0",
+    "@zleap-ai/app-cli-win32-arm64": "0.10.0"
+  },
+  "keywords": [
+    "zleap",
+    "zleapos",
+    "app-cloud",
+    "cli",
+    "mcp"
+  ]
+}

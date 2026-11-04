@@ -1,0 +1,32 @@
+{
+  "darwin-arm64": {
+    "file": "bin/zleap-app",
+    "sha256": "569eab6e918ae9de1fa78c9cfd8096d8de719097326f32f13722401796ca4440",
+    "commit": "bd5c871c"
+  },
+  "linux-x64": {
+    "file": "bin/zleap-app",
+    "sha256": "068ab608a8520d438933168a1c7f3831ac2abbede244ec1fbb7e50bf8034899c",
+    "commit": "bd5c871c"
+  },
+  "linux-arm64": {
+    "file": "bin/zleap-app",
+    "sha256": "7b4319495c697a112dd1b894e71df19a984274f07e465dd382a10f63b66db7c7",
+    "commit": "bd5c871c"
+  },
+  "darwin-x64": {
+    "file": "bin/zleap-app",
+    "sha256": "3074f176f52cf73370ddf82ec6c662265ea879db3a57f82a7278dc5899adb593",
+    "commit": "bd5c871c"
+  },
+  "win32-x64": {
+    "file": "bin/zleap-app.exe",
+    "sha256": "629f073d7f0e574fabdd9548663c87820136754fa9c034e85cbab234738c6cdd",
+    "commit": "bd5c871c"
+  },
+  "win32-arm64": {
+    "file": "bin/zleap-app.exe",
+    "sha256": "b85b6571b5e3ac45409c41a9b96484e1dce02f08dfd8cb419fae087ee86f711f",
+    "commit": "bd5c871c"
+  }
+}

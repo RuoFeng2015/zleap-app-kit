@@ -1,0 +1,451 @@
+{
+  "schema": "zleap.app/2",
+  "appid": "zl7b2843d539ca2df7",
+  "name": "同事圈",
+  "version": "1.2.1",
+  "description": "公司内部的小型朋友圈：发动态、配图、点赞、评论；「我的互动」每 5 分钟自动统计。",
+  "execution": "both",
+  "host_api": {
+    "profile": "app-runtime/2",
+    "requires": [
+      "user.profile"
+    ]
+  },
+  "runtime": {
+    "ui": {
+      "type": "iframe",
+      "entry": "index.html"
+    },
+    "capabilities": {
+      "requires": [
+        {
+          "id": "cloud.database.read",
+          "reason": "读取同事们的动态、点赞和评论",
+          "scope": "current_user",
+          "optional": false
+        },
+        {
+          "id": "cloud.database.write",
+          "reason": "发动态、点赞、评论",
+          "scope": "current_user",
+          "optional": false
+        },
+        {
+          "id": "cloud.storage.read",
+          "reason": "查看动态的原图",
+          "scope": "current_user",
+          "optional": false
+        },
+        {
+          "id": "cloud.storage.write",
+          "reason": "上传动态的原图",
+          "scope": "current_user",
+          "optional": false
+        }
+      ],
+      "provides": [
+        {
+          "id": "zl7b2843d539ca2df7.stats",
+          "contract_version": "1.0.0",
+          "title": "统计我的互动",
+          "execution": "headless",
+          "provider": "moments.stats",
+          "effect": "write",
+          "discoverable": false,
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": [
+                  "manual",
+                  "scheduled"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "posts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "likes_received": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "comments_received": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "error": {
+                "type": "string",
+                "maxLength": 300
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    "backend": {
+      "functions": [
+        {
+          "name": "stats",
+          "entry": "cloudfunctions/stats",
+          "runtime_profile": "node-lts/1",
+          "timeout_seconds": 30,
+          "memory_mb": 256
+        }
+      ],
+      "providers": [
+        {
+          "id": "moments.stats",
+          "type": "managed_function",
+          "function": "stats",
+          "permissions": {
+            "capabilities": [
+              "cloud.database.read",
+              "cloud.database.write"
+            ],
+            "data": [
+              {
+                "collection": "me",
+                "scope": "current_user",
+                "actions": [
+                  "get"
+                ],
+                "fields": [
+                  "nickname",
+                  "created_at"
+                ]
+              },
+              {
+                "collection": "posts",
+                "scope": "current_user",
+                "actions": [
+                  "query"
+                ],
+                "fields": [
+                  "author"
+                ]
+              },
+              {
+                "collection": "likes",
+                "scope": "current_user",
+                "actions": [
+                  "query"
+                ],
+                "fields": [
+                  "post_author",
+                  "author"
+                ]
+              },
+              {
+                "collection": "comments",
+                "scope": "current_user",
+                "actions": [
+                  "query"
+                ],
+                "fields": [
+                  "post_author",
+                  "author"
+                ]
+              },
+              {
+                "collection": "digest",
+                "scope": "current_user",
+                "actions": [
+                  "get",
+                  "set"
+                ],
+                "fields": [
+                  "posts",
+                  "likes_received",
+                  "comments_received",
+                  "source",
+                  "updated_at"
+                ]
+              }
+            ]
+          },
+          "retry": {
+            "mode": "none",
+            "max_attempts": 1
+          }
+        }
+      ]
+    }
+  },
+  "data": {
+    "collections": [
+      "posts",
+      "photos",
+      "likes",
+      "comments",
+      "me",
+      "digest"
+    ],
+    "schemas": {
+      "posts": {
+        "type": "object",
+        "properties": {
+          "author": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "nickname": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "photo_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "created_at": {
+            "type": "integer",
+            "minimum": 0,
+            "x-agentos-value-type": "date_ms"
+          }
+        },
+        "required": [
+          "author",
+          "nickname",
+          "text",
+          "photo_count",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "photos": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1
+          },
+          "author": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "idx": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "data": {
+            "type": "string",
+            "maxLength": 200000,
+            "minLength": 1
+          },
+          "original": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "created_at": {
+            "type": "integer",
+            "minimum": 0,
+            "x-agentos-value-type": "date_ms"
+          }
+        },
+        "required": [
+          "post_id",
+          "author",
+          "idx",
+          "data",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "likes": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1
+          },
+          "author": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "post_author": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "nickname": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "created_at": {
+            "type": "integer",
+            "minimum": 0,
+            "x-agentos-value-type": "date_ms"
+          }
+        },
+        "required": [
+          "post_id",
+          "author",
+          "post_author",
+          "nickname",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "comments": {
+        "type": "object",
+        "properties": {
+          "post_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1
+          },
+          "author": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "post_author": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1
+          },
+          "nickname": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1
+          },
+          "created_at": {
+            "type": "integer",
+            "minimum": 0,
+            "x-agentos-value-type": "date_ms"
+          }
+        },
+        "required": [
+          "post_id",
+          "author",
+          "post_author",
+          "nickname",
+          "text",
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "me": {
+        "type": "object",
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "created_at": {
+            "type": "integer",
+            "minimum": 0,
+            "x-agentos-value-type": "date_ms"
+          }
+        },
+        "required": [
+          "created_at"
+        ],
+        "additionalProperties": false
+      },
+      "digest": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "likes_received": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comments_received": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "scheduled"
+            ]
+          },
+          "updated_at": {
+            "type": "integer",
+            "minimum": 0,
+            "x-agentos-value-type": "date_ms"
+          }
+        },
+        "required": [
+          "posts",
+          "likes_received",
+          "comments_received",
+          "source",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "policies": {
+      "posts": {
+        "partition": "shared",
+        "write": "doc.author == auth.openid"
+      },
+      "photos": {
+        "partition": "shared",
+        "write": "doc.author == auth.openid"
+      },
+      "likes": {
+        "partition": "shared",
+        "write": "doc.author == auth.openid"
+      },
+      "comments": {
+        "partition": "shared",
+        "write": "doc.author == auth.openid || doc.post_author == auth.openid"
+      }
+    }
+  },
+  "background": {
+    "on_install": "disabled",
+    "modes": [
+      "on_demand",
+      "scheduled"
+    ]
+  },
+  "triggers": {
+    "scheduled": [
+      {
+        "id": "stats_refresh",
+        "cron": "*/5 * * * *",
+        "timezone": "Asia/Shanghai",
+        "capability": "zl7b2843d539ca2df7.stats",
+        "data": {
+          "source": "scheduled"
+        },
+        "description": "每 5 分钟统计我的互动",
+        "enabled": false
+      }
+    ],
+    "events": []
+  }
+}
