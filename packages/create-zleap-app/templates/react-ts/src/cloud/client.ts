@@ -65,10 +65,10 @@ export function describeError(error: unknown): string {
   const code = errorCode(error);
   const hints: Record<string, string> = {
     SCOPE_FORBIDDEN: '还没有这项权限：点应用窗口顶部「权限」，勾选后保存（应用会自动重新加载）。',
-    PUBLISHER_REQUIRED: '开发数据只对应用发布者开放；给其他人用需要先上线到生产环境。',
-    ENV_FORBIDDEN: '这个应用在当前环境还没开通：发布者需要先把版本激活到生产。',
+    PUBLISHER_REQUIRED: '开发数据只对应用成员开放；给其他人用请在云开发控制台「版本管理」里发布为线上版本。',
+    ENV_FORBIDDEN: '这个应用还没有上线：请应用成员在云开发控制台「版本管理」里把版本发布为线上版本（平台会自动准备生产环境）。',
     RESOURCE_NOT_READY: '云数据库正在开通，通常一分钟内就绪，请稍后刷新。',
-    COLLECTION_NOT_FOUND: '数据集合还没建好：生产环境需要先开通数据库（或运行 zleap-app prepare）。',
+    COLLECTION_NOT_FOUND: '数据集合还没建好：开发环境稍等一分钟后刷新；线上版本请应用成员重新发布一次（发布时自动建生产集合）。',
     SCHEMA_INVALID: '数据不符合集合结构（字段缺失、类型不对、内容过大或多了未声明字段）。',
     VERSION_CONFLICT: '数据已在别处更新，请刷新后再改。',
     COMMIT_UNKNOWN: '保存结果未知，请刷新核对后再决定是否重试。',
