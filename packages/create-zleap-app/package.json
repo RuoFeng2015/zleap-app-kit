@@ -23,9 +23,9 @@
   },
   "zleapKit": {
     "cliPackage": "@zleap-ai/app-cli",
-    "cliVersion": "0.10.0",
+    "cliVersion": "0.10.1",
     "sdkPackage": "@zleap-ai/app-sdk",
-    "sdkVersion": "0.10.0",
+    "sdkVersion": "0.10.1",
     "skillsRepo": "RuoFeng2015/zleap-app-kit"
   },
   "keywords": [

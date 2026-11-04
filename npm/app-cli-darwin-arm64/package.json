@@ -1,6 +1,6 @@
 {
   "name": "@zleap-ai/app-cli-darwin-arm64",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "zleap-app 预编译二进制（darwin arm64），由 @zleap-ai/app-cli 自动选用",
   "license": "MIT",
   "repository": {
@@ -18,7 +18,7 @@
   ],
   "preferUnplugged": true,
   "zleapApp": {
-    "commit": "bd5c871c",
-    "sha256": "569eab6e918ae9de1fa78c9cfd8096d8de719097326f32f13722401796ca4440"
+    "commit": "5437f815",
+    "sha256": "c34819c3ecb4dba2aac4e0206689fc8294476be2f5ec1c2e4a29789321cfc231"
   }
 }
