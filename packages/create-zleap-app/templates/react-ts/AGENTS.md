@@ -3,13 +3,15 @@
 本项目是运行在 zleapOS 沙箱窗口里的云开发应用：React + Vite 构建到 `dist/`，`dist/` 就是应用包根目录。
 做任何云开发相关改动前，先读项目内 skill `zleap-cloud-app`（`.agents/skills/` 或 `.claude/skills/`）。
 
+**开发路线**：先用 MCP 服务 `zleap-app`（`.mcp.json` 已配好）查当前用户可用的 OS 接口和 SDK——`os_business_search` → `os_business_get` → `os_business_call` 试调；OS 已有的数据和功能直接用 `zl.cloud.os.api.fetch`；应用自己产生的数据才建集合；都没有的后端逻辑才写云函数。不要猜接口，不要重复造轮子。
+
 ## 命令
 
 | 目的 | 命令 |
 | --- | --- |
 | 类型检查 | `npm run typecheck` |
 | 构建 + 平台静态检查 | `npm run check`（`runtime_test=not_checked`，不代表能用） |
-| 登录 OS（浏览器授权，自动续期，最长 30 天） | `npm run login -- --target <OS 地址>` |
+| 登录 OS（浏览器授权，自动续期，最长 30 天；manifest 还没有 appid 时同时新建应用） | `npm run login -- --target <OS 地址>` |
 | 构建→检查→上传开发版本→装到本人 | `npm run deploy` |
 | 安装/权限/版本诊断 | `npm run status` |
 | 页面错误与云函数日志（24h） | `npm run logs`（`-- --environment dev\|prod`、`--invocation <调用编号>`） |

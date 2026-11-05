@@ -18,6 +18,7 @@ import {
   validateAppId,
   validateAppKey,
   validateName,
+  validateOptionalAppId,
 } from '../packages/create-zleap-app/lib/scaffold.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -133,4 +134,55 @@ test('skills 子命令：给已有项目补装 skills，不动其他文件', () 
   assert.deepEqual(readdirSync(dir).sort(), ['.agents', '.claude']);
   const missing = spawnSync(process.execPath, [join(root, 'packages/create-zleap-app/index.js'), 'skills', join(dir, 'nope')], { encoding: 'utf8' });
   assert.notEqual(missing.status, 0);
+});
+
+test('vanilla 模板：应用在 app/，共用部署脚本，占位符全部替换，不需要构建工具', () => {
+  const targetDir = join(mkdtempSync(join(tmpdir(), 'zleap-vanilla-')), 'notes');
+  scaffold({
+    templateDir: join(root, 'packages/create-zleap-app/templates/vanilla'),
+    targetDir,
+    appid: 'zl0123456789abcdef',
+    name: '我的"笔记"',
+    packageName: 'notes',
+    cliPackage: '@zleap-ai/app-cli',
+    cliVersion: '0.11.0',
+    sdkPackage: '@zleap-ai/app-sdk',
+  });
+  for (const rel of ['app/manifest.json', 'app/index.html', 'app/main.js', 'app/style.css', 'app/LICENSE', 'scripts/zleap.mjs', 'AGENTS.md', 'CLAUDE.md', '.gitignore', 'package.json']) {
+    assert.ok(existsSync(join(targetDir, rel)), rel);
+  }
+  const manifest = JSON.parse(readFileSync(join(targetDir, 'app/manifest.json'), 'utf8'));
+  assert.equal(manifest.appid, 'zl0123456789abcdef');
+  assert.equal(manifest.name, '我的"笔记"');
+  assert.match(readFileSync(join(targetDir, 'app/index.html'), 'utf8'), /我的&quot;笔记&quot;/);
+  const pkg = JSON.parse(readFileSync(join(targetDir, 'package.json'), 'utf8'));
+  assert.deepEqual(pkg.zleap, { packageDir: 'app', build: false, sdkDir: 'app/sdk' });
+  assert.deepEqual(Object.keys(pkg.dependencies), ['@zleap-ai/app-sdk']);
+  assert.deepEqual(Object.keys(pkg.devDependencies), ['@zleap-ai/app-cli']);
+  assert.ok(!existsSync(join(targetDir, 'vite.config.ts')));
+  assert.match(readFileSync(join(targetDir, '.gitignore'), 'utf8'), /app\/sdk/);
+  // 两个模板用同一份部署脚本
+  const react = join(mkdtempSync(join(tmpdir(), 'zleap-react-')), 'r');
+  scaffold({ templateDir, targetDir: react, appid: 'zl0123456789abcdef', name: 'r', packageName: 'r', cliPackage: '@zleap-ai/app-cli', cliVersion: '0.11.0', sdkPackage: '@zleap-ai/app-sdk' });
+  assert.equal(readFileSync(join(react, 'scripts/zleap.mjs'), 'utf8'), readFileSync(join(targetDir, 'scripts/zleap.mjs'), 'utf8'));
+  assert.deepEqual(JSON.parse(readFileSync(join(react, 'package.json'), 'utf8')).zleap, { packageDir: 'dist' });
+});
+
+test('参数解析：--template vanilla', () => {
+  assert.equal(parseArgs(['my-app', '--template', 'vanilla']).template, 'vanilla');
+});
+
+test('appid 可留空，两个模板都带 MCP 配置（不写死部署地址）', () => {
+  for (const template of ['react-ts', 'vanilla']) {
+    const dir = join(mkdtempSync(join(tmpdir(), 'zleap-noid-')), 'a');
+    scaffold({ templateDir: join(root, 'packages/create-zleap-app/templates', template), targetDir: dir, name: 'a', packageName: 'a', cliPackage: '@zleap-ai/app-cli', cliVersion: '0.12.0', sdkPackage: '@zleap-ai/app-sdk' });
+    const manifest = JSON.parse(readFileSync(join(dir, template === 'vanilla' ? 'app/manifest.json' : 'manifest.json'), 'utf8'));
+    assert.equal(manifest.appid, '');
+    for (const rel of ['.mcp.json', '.cursor/mcp.json']) {
+      const config = JSON.parse(readFileSync(join(dir, rel), 'utf8'));
+      assert.deepEqual(config.mcpServers['zleap-app'], { command: 'npx', args: ['zleap-app', 'mcp', 'serve', '--workspace', '.'] }, rel);
+    }
+  }
+  assert.equal(validateOptionalAppId(''), null);
+  assert.notEqual(validateOptionalAppId('bad'), null);
 });

@@ -13,6 +13,7 @@ import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 import {
+  BUILD_TEMPLATES,
   TEMPLATES,
   detectPackageManager,
   installSkills,
@@ -21,8 +22,8 @@ import {
   parseArgs,
   scaffold,
   toPackageName,
-  validateAppId,
   validateName,
+  validateOptionalAppId,
 } from './lib/scaffold.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -45,9 +46,9 @@ ${bold('create-zleap-app')} ${dim(`v${pkg.version}`)} — 创建 zleapOS 云开�
   npx create-zleap-app@latest skills [目录]   给已有项目补装 AI 编程工具 skills（默认当前目录）
 
 选项
-  --appid <appid>   应用 appid：在 zleapOS 云开发控制台「创建应用」后复制（形如 zl3f9a2c7e1b0d4a68）
+  --appid <appid>   已有应用的 appid（形如 zl3f9a2c7e1b0d4a68）；不填时第一次 npm run login 会在授权时自动新建应用
   --name <名称>     应用显示名称
-  --template <名>   模板：${TEMPLATES.join(' / ')}（默认 react-ts）
+  --template <名>   模板：react-ts（React + TS + Vite，默认）/ vanilla（原生 HTML/JS，不用构建，装得快）
   --target <URL>    zleapOS 地址，写入项目配置，之后 npm run login 不再询问
   --pm <名>         包管理器：npm / pnpm / yarn / bun（默认跟随调用方）
   --no-install      不安装依赖
@@ -92,10 +93,10 @@ async function main() {
   const options = parseArgs(argv);
   if (options.help) return console.log(HELP);
   if (options.version) return console.log(pkg.version);
-  // 生成器本身在旧 Node 上也能跑，但生成的项目构建不了：先说清楚，不中断（用户可能稍后再升级）。
-  const nodeProblem = nodeVersionProblem();
-  if (nodeProblem) console.log(red(`! ${nodeProblem}`));
   if (!TEMPLATES.includes(options.template)) throw new Error(`未知模板：${options.template}（可选 ${TEMPLATES.join(' / ')}）`);
+  // 生成器本身在旧 Node 上也能跑，但构建型模板生成的项目构建不了：先说清楚，不中断（用户可能稍后再升级）。
+  const nodeProblem = BUILD_TEMPLATES.includes(options.template) ? nodeVersionProblem() : null;
+  if (nodeProblem) console.log(red(`! ${nodeProblem}`));
 
   const interactive = process.stdin.isTTY && !options.yes;
   const rl = interactive ? createInterface({ input: process.stdin, output: process.stdout }) : null;
@@ -107,11 +108,11 @@ async function main() {
 
     let appid = options.appid;
     if (!appid && rl) {
-      console.log(dim('  appid 在 zleapOS 云开发控制台「创建应用」后获得，复制过来粘贴即可。'));
-      appid = await prompt(rl, 'appid', '', validateAppId);
+      console.log(dim('  已有应用就粘贴它的 appid；留空则在第一次 npm run login 授权时自动新建应用。'));
+      appid = await prompt(rl, 'appid（可留空）', '', validateOptionalAppId);
     }
-    const idProblem = validateAppId(appid);
-    if (idProblem) throw new Error(`${idProblem}\n  用法：npm create zleap-app@latest ${dir} -- --appid <appid>`);
+    const idProblem = validateOptionalAppId(appid);
+    if (idProblem) throw new Error(`${idProblem}\n  用法：npm create zleap-app@latest ${dir} -- --appid <appid>（或不带 --appid，登录时自动新建应用）`);
 
     let name = options.name;
     if (!name) name = rl ? await prompt(rl, '应用名称', toPackageName(dir), validateName) : toPackageName(dir);
@@ -122,7 +123,7 @@ async function main() {
     if (!options.name && !rl)
       console.log(red(`! 没有提供 --name，应用名称暂用目录名「${name}」。发布时应用名以 manifest.json 的 name 为准，请改成控制台里的应用名（或重新生成时加 --name "应用名"）`));
 
-    console.log(`\n在 ${cyan(targetDir)} 创建 ${bold(name)}（${appid}）`);
+    console.log(`\n在 ${cyan(targetDir)} 创建 ${bold(name)}（${appid || '登录时新建应用'}）`);
     scaffold({
       templateDir: join(here, 'templates', options.template),
       targetDir,
@@ -165,13 +166,14 @@ async function main() {
 ${bold('完成！接下来：')}
 
   cd ${cd}${installed ? '' : `\n  ${pm} install`}
-  ${runScript('login')}${options.target ? '' : ' -- --target https://你的-os-地址'}   ${dim('# 浏览器授权')}
-  ${runScript('deploy')}                                         ${dim('# 构建→检查→上传→装到你的桌面')}
+  ${runScript('login')}${options.target ? '' : ' -- --target https://你的-os-地址'}   ${dim(appid ? '# 浏览器授权' : '# 浏览器授权，同时新建应用')}
+  ${runScript('deploy')}                                         ${dim(BUILD_TEMPLATES.includes(options.template) ? '# 构建→检查→上传→装到你的桌面' : '# 检查→上传→装到你的桌面（不用构建）')}
 
   然后从 zleapOS 启动台打开应用（开发环境与数据库在安装时自动开通）。
 
 ${bold('让 AI 编程工具帮你开发')}
-  项目里已带 AGENTS.md 和 skills，直接在 Codex / Claude Code / Pi / OpenCode / Cursor 里打开本目录即可。
+  项目里已带 AGENTS.md、skills 和 MCP 配置（.mcp.json、.cursor/mcp.json），直接在 Claude Code / Cursor / Codex / OpenCode 里打开本目录即可。
+  AI 会先通过 MCP 查清你账号下可用的 OS 接口与 SDK，没有的再用云函数补充。
   已有项目补装 skills：${cyan('npx create-zleap-app@latest skills')}
 `);
   } finally {

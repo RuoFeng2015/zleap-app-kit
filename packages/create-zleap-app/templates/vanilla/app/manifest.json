@@ -1,0 +1,33 @@
+{
+  "schema": "zleap.app/2",
+  "appid": "__APPID__",
+  "name": "__APP_NAME__",
+  "version": "1.0.0",
+  "description": "不用构建的原生网页应用，数据保存在 zleapOS App Cloud 的个人待办。",
+  "execution": "foreground",
+  "host_api": { "profile": "app-runtime/2" },
+  "runtime": {
+    "ui": { "type": "iframe", "entry": "index.html" },
+    "capabilities": {
+      "requires": [
+        { "id": "cloud.database.read", "reason": "读取本人待办", "scope": "current_user", "optional": false },
+        { "id": "cloud.database.write", "reason": "保存本人待办", "scope": "current_user", "optional": false }
+      ]
+    }
+  },
+  "data": {
+    "collections": ["todos"],
+    "schemas": {
+      "todos": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "done": { "type": "boolean" },
+          "created_at": { "type": "number" }
+        },
+        "required": ["title", "done", "created_at"],
+        "additionalProperties": false
+      }
+    }
+  }
+}

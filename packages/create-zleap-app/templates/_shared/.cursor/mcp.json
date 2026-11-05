@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "zleap-app": {
+      "command": "npx",
+      "args": [
+        "zleap-app",
+        "mcp",
+        "serve",
+        "--workspace",
+        "."
+      ]
+    }
+  }
+}

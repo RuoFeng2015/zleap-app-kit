@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>__APP_NAME__</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>__APP_NAME__</h1>
+        <span id="status" class="status">连接中…</span>
+      </header>
+      <form id="add" class="add" autocomplete="off">
+        <input id="title" maxlength="200" placeholder="要做什么？" required />
+        <button type="submit">添加</button>
+      </form>
+      <p id="error" class="error" role="alert" hidden></p>
+      <ul id="list" class="list"></ul>
+      <p id="empty" class="empty" hidden>还没有待办。</p>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

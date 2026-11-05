@@ -12,23 +12,41 @@ zleapOS 云开发应用 = 一个网页（运行在 zleapOS 桌面的沙箱 ifram
 
 | 看到 | 说明 | 构建/打包目录 |
 | --- | --- | --- |
-| `vite.config.ts` + `src/cloud/` + `scripts/zleap.mjs` | create-zleap-app 的 React 模板（推荐） | `dist/`（构建产物） |
-| 根目录 `index.html` + `main.js` + `sdk/` | `zleap-app init hosted-package` 的原生模板 | 项目根目录 |
+| `vite.config.ts` + `src/cloud/` + `scripts/zleap.mjs` | create-zleap-app 的 React 模板（组件化、复杂界面） | `dist/`（构建产物） |
+| `package.json` 里 `"zleap": { "packageDir": "app" }` + `app/main.js` + `scripts/zleap.mjs` | create-zleap-app 的 vanilla 模板（原生 HTML/JS，不用构建，表单 / 列表 / 统计类首选） | `app/` |
+| 根目录 `index.html` + `main.js` + `sdk/`，没有 package.json | `zleap-app init hosted-package` 的原生模板 | 项目根目录 |
 | 都没有 | 新建项目，见第 1 节 | — |
 
-两种形态的 SDK 是同一套 API，只是来源不同：React 模板从 npm 包 `@zleap-ai/app-sdk` 导入（`/host` 宿主能力、`/workspace` 工作区），
-以 `node_modules/@zleap-ai/app-sdk/dist/types/*.d.ts` 为准，并与 `@zleap-ai/app-cli` 保持同版本；原生模板用项目里的 `./sdk/*.js`。
+几种形态的 SDK 是同一套 API，只是来源不同：React 模板从 npm 包 `@zleap-ai/app-sdk` 导入（`/host` 宿主能力、`/workspace` 工作区），
+以 `node_modules/@zleap-ai/app-sdk/dist/types/*.d.ts` 为准，并与 `@zleap-ai/app-cli` 保持同版本；vanilla 模板用 `app/sdk/*.js`（`npm install` / `npm run deploy` 从同一个 npm 包复制，不要手改）；原生模板用项目里的 `./sdk/*.js`。
 参考资料里写 `./sdk/index.js` / `./sdk/zleap-sdk.js` 的地方，在 React 模板里分别对应 `@zleap-ai/app-sdk` / `@zleap-ai/app-sdk/host`。
+
+## 开发路线：先查现成能力，再补云函数（所有模板都一样）
+
+React 模板、vanilla 模板、原生模板走同一条路线。目的是不重复造轮子、少踩运行时限制：
+
+1. **先查当前用户能用什么**（项目里已配好 MCP 服务 `zleap-app`，见 `.mcp.json`；没登录时 MCP 工具会报未登录，请用户先 `npm run login`）：
+   - `os_business_search(query)`：按需求搜索当前账号有权限的 OS 接口（待办、文件、日程、项目、AI 生成文字、定时任务……），中文、英文关键词各搜一次；
+   - `os_business_get(operation)`：读契约和页面写法 `page_call`（`page_unavailable` 非空表示页面不能直接调，结果里给替代方案）；
+   - `os_business_call(operation, input)`：用用户自己的账号试调一次，写接口也要试（会改真实数据，提醒用户用测试账号）；
+   - `app_capabilities_search` / `app_capability_get`：平台后台能力；`app_sdk_get` / `zleap://sdk/guide`：SDK 能力与类型；`app_spec_get(section=model)`：Manifest 字段。
+2. **OS 已有的数据和功能直接用**：页面里 `zl.cloud.os.api.fetch('/路径')`（不带 `/api/v1`），按使用者权限执行，不要在应用里另存一份。
+3. **应用自己产生的数据才建集合**（`db.collection`，在 manifest 声明）。
+4. **以上都没有的后端逻辑才写云函数**（references/cloud-functions.md）。云函数不能调 OS 接口，需要 OS 数据时由页面取到后传入。
+
+一个接口不可用时先找替代接口，搜不到再判断 OS 没有；不要猜接口路径，也不要读平台源码。
 
 ## 1. 新建项目（非交互，适合 AI 执行）
 
 ```bash
 npm create zleap-app@latest <目录> -- --appid <appid> --name "<应用名>" -y
 # 已知 OS 地址时加：--target https://os.example.com
+# 表单 / 列表 / 统计这类不需要组件化的应用，加 --template vanilla：不装 React/Vite，不用构建，部署更快
 ```
 
-`appid` 由平台生成，**不能自己编**：请用户先在云开发控制台侧栏顶部的应用切换下拉里点「创建应用」（填名称），复制生成的 `appid`
-（`zl` + 16 位小写十六进制，如 `zl3f9a2c7e1b0d4a68`），创建者自动成为管理员。没有 `appid` 时非交互脚手架会报错并提示先创建应用——问用户要，不要猜。
+`appid` 由平台生成，**不能自己编**。还没有应用时**不带 `--appid`** 生成项目，然后请用户运行 `npm run login`：浏览器授权页会写明「新建应用「<应用名>」」，
+用户核对确认码点允许后，平台创建应用（用户是管理员，一次授权只建一个），CLI 把 `appid`（`zl` + 16 位小写十六进制）写进 manifest。
+用户已经有应用时，用 `--appid <appid>` 生成（或填进 manifest），不要再建新的。
 manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI 登录参数名是 `--app-key`，填的就是 appid；CLI 输出里的 `app_key` 字段也是 appid。
 同事要一起开发，请管理员在控制台「团队」→「成员」里把他加为开发者。每个成员的每次上传都是一个开发版本，在控制台「版本管理」里可见；
 成员可以在「版本管理」用「切换到此版本」运行同事上传、未发布的版本（只切自己的安装；非成员看不到开发版本）。带云函数的版本上传时平台自动签名、安装 / 切换 / 允许后台运行时自动绑定，appid 应用不需要签名激活操作。给全企业用 = 在「版本管理」里「发布为线上版本」，见 skill `zleap-cloud-app-release`。
@@ -47,11 +65,12 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 
 ## 3. 开发一个功能的标准流程
 
+0. **先查现成能力**：按上面「开发路线」用 MCP 查 OS 接口与 SDK，能直接调的就不建集合、不写云函数。
 1. **建模**：在 `manifest.json` 加集合与 strict schema（类型只支持 object/array/string/number/integer/boolean/null，关键字子集见 references/manifest.md）。日期用 `number` 存毫秒，或 `integer` + `"x-agentos-value-type": "date_ms"`。
 2. **权限**：需要的能力加进 `requires`（`cloud.database.read/write`、`cloud.storage.read/write`、`os.agent.complete` 等，白名单外的非可选能力会让应用「暂不可用」）。`reason` 会展示给用户，写具体用途。
 3. **数据层**：React 模板在 `src/cloud/` 下按集合写一个模块（参照 `src/cloud/todos.ts`），组件只调用这些函数；错误用 `describeError()` 展示。
 4. **本地验证**：`npm run typecheck && npm run check`（`check` 通过只代表静态契约，`runtime_test=not_checked`）。
-5. **部署到自己桌面**：`npm run deploy`（构建 → 检查 → 上传开发版本（appid 应用仅成员可见）→ 安装/切换本人安装；内容变化时自动递增补丁号）。
+5. **部署到自己桌面**：`npm run deploy`（构建 → 检查 → 上传开发版本（appid 应用仅成员可见）→ 安装/切换本人安装 → 按平台诊断准备资源；内容变化时自动递增补丁号）。上传之后的步骤由 `zleap-app deploy` 完成，可重复执行，部署记录在 `.zleap/state.json`；不要再手动 publish / install / update 另起一套记录。
    - 报未登录/会话过期 → 请用户运行 `npm run login -- --target <OS 地址>` 并在浏览器核对确认码。
    - 报 `DATA_MIGRATION_REQUIRED` → 新版本改了 data/storage 声明，见第 5 节。
 6. **请用户验收**：安装时平台会自动创建开发环境、开通数据库并按声明建集合，`npm run deploy` 结束时会打印状态；显示未就绪时，请用户在「云开发控制台」选中应用 →「概览」按提示处理。然后从启动台打开应用（已打开的点「重新加载应用」）。

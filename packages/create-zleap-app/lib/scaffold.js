@@ -1,7 +1,7 @@
 // 项目生成的纯逻辑：参数解析、命名校验、模板复制与占位符替换、skills 安装。
 // 不依赖第三方包，便于 npx 秒开，也便于单元测试。
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { basename, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 
 /** 平台生成的 appid（云开发控制台「创建应用」得到），与服务端 pkg/appid.Platform 一致。 */
 export const APPID_PATTERN = /^zl[0-9a-f]{16}$/;
@@ -9,10 +9,14 @@ export const APPID_PATTERN = /^zl[0-9a-f]{16}$/;
 /** 旧的命名空间 app_key（com.example.todo）。服务端在清理阶段之前仍接受，只为已有应用保留。 */
 export const APP_KEY_PATTERN = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*)+$/;
 
-export const TEMPLATES = ['react-ts'];
+/** react-ts：React + TypeScript + Vite（构建到 dist/）；vanilla：原生 HTML / JS，不用构建（应用在 app/）。 */
+export const TEMPLATES = ['react-ts', 'vanilla'];
+
+/** 需要 Vite 7 的模板（对 Node.js 版本有要求）。 */
+export const BUILD_TEMPLATES = ['react-ts'];
 
 /** 需要做占位符替换的文本文件（相对模板根目录）。 */
-const SUBSTITUTED = ['package.json', 'manifest.json', 'index.html', 'LICENSE', 'README.md', 'AGENTS.md'];
+const SUBSTITUTED = ['package.json', 'manifest.json', 'index.html', 'LICENSE', 'README.md', 'AGENTS.md', 'app/manifest.json', 'app/index.html', 'app/LICENSE'];
 
 /** 为 AI 编程工具安装 skills 的项目内目录：.agents/skills 覆盖 Codex、Pi、OpenCode、Cursor、Gemini CLI、Copilot 等，.claude/skills 给 Claude Code。 */
 export const SKILL_TARGETS = ['.agents/skills', '.claude/skills'];
@@ -30,6 +34,11 @@ export function copyTree(from, to, skip = () => false, base = from) {
 }
 
 /** appid：优先平台 appid；旧命名空间 app_key 仍可用（已有应用）。 */
+/** appid 可以留空：留空时 npm run login 会在授权时自动新建应用。 */
+export function validateOptionalAppId(value) {
+  return value ? validateAppId(value) : null;
+}
+
 export function validateAppId(value) {
   if (!value) return '请提供 appid：在 zleapOS 云开发控制台「创建应用」后复制（形如 zl3f9a2c7e1b0d4a68）';
   if (APPID_PATTERN.test(value)) return null;
@@ -153,11 +162,15 @@ const escapeHTML = (text) => text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<
 
 /** 复制模板并替换占位符。返回写入的文件数。 */
 export function scaffold({ templateDir, targetDir, appid, appKey, name, packageName, cliPackage, cliVersion, sdkPackage, sdkVersion = cliVersion, year = new Date().getFullYear() }) {
-  copyTree(templateDir, targetDir, (rel) => /(^|[\\/])(node_modules|dist|out|\.zleap)([\\/]|$)/.test(rel));
+  const skip = (rel) => /(^|[\\/])(node_modules|dist|out|\.zleap)([\\/]|$)/.test(rel);
+  copyTree(templateDir, targetDir, skip);
+  // 各模板共用的文件（部署脚本 scripts/zleap.mjs）只维护一份，放在 templates/_shared。
+  const shared = join(dirname(templateDir), '_shared');
+  if (existsSync(shared)) copyTree(shared, targetDir, skip);
   if (existsSync(join(targetDir, '_gitignore'))) renameSync(join(targetDir, '_gitignore'), join(targetDir, '.gitignore'));
 
   const replacements = {
-    __APPID__: appid ?? appKey,
+    __APPID__: appid ?? appKey ?? '',
     __APP_NAME__: name,
     __PKG_NAME__: packageName,
     __CLI_PACKAGE__: cliPackage,
