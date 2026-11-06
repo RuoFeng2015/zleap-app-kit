@@ -29,7 +29,7 @@ React 模板、vanilla 模板、原生模板走同一条路线。目的是不重
    - `os_business_search(query)`：按需求搜索当前账号有权限的 OS 接口（待办、文件、日程、项目、AI 生成文字、定时任务……），中文、英文关键词各搜一次。**先看返回的 `page_api.enabled`**：`false` 表示这个部署没开放页面 API，页面里 `api.fetch` 一律失败，改用 SDK 能力、集合或云函数，并告诉用户；
    - `os_business_get(operation)`：读契约和页面写法 `page_call`（`page_unavailable` 非空表示页面不能直接调，结果里给替代方案）；
    - `os_business_call(operation, input)`：用用户自己的账号试调。读接口直接调；**写 / 删接口先传 `dry_run: true`**（只校验参数、预览请求，不写数据），真正调用会改用户的真实数据，要调就先告诉用户、试完删掉；
-   - 页面里要 AI 生成内容：用 `POST /agents/complete`（要 JSON 传 `output_schema`，结果在 `data.result`；涉及日期把今天和两周日历写进提示词；契约模式可能要 40–60 秒，界面要提示等待）。没有页面参与（定时、触发器）才用后台能力 `os.agent.complete`。写法见文档「Cloud SDK 使用 → 调用 AI 生成内容」；
+   - 页面里要 AI 生成内容：用 `POST /agents/complete`（要 JSON 传 `output_schema`，结果在 `data.result`；涉及日期把今天和两周日历写进提示词；Schema 会随 system 发给模型，可选值用 `enum` 限定、代码再核对；模型耗时波动大，界面写「通常 30–90 秒」并显示已等待秒数，`timeout_ms` 是整次上限（服务端最多 110 秒，超时 40049、`data.reason=timeout`），`max_retries` 0–1，失败给「重试」按钮）。没有页面参与（定时、触发器）才用后台能力 `os.agent.complete`。写法见文档「Cloud SDK 使用 → 调用 AI 生成内容」；
    - `app_capabilities_search` / `app_capability_get`：平台后台能力；`app_sdk_get` / `zleap://sdk/guide`：SDK 能力与类型；`app_spec_get(section=model)`：Manifest 字段。
 2. **OS 已有的数据和功能直接用**：页面里 `zl.cloud.os.api.fetch('/路径')`（不带 `/api/v1`），按使用者权限执行，不要在应用里另存一份。
    `api.fetch` 不依赖云环境：**只调 OS 接口、没有集合 / 云函数 / 云文件的应用，不要调用 `zl.cloud.init` 和 `zl.cloud.os.ready()`**（这类应用平台不准备云环境，`ready()` 会报 `ENV_FORBIDDEN`），连接状态以第一次 `api.fetch` 成功为准。模板里的 `init`/`ready` 是给云数据库用的，删掉集合时一并删掉。
