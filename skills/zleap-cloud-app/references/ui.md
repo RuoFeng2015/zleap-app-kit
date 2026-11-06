@@ -34,7 +34,7 @@
 | 提示 | `zl-alert`（`--info`/`--success`/`--warning`/`--danger`）、`zl-toast` |
 | 空 / 加载 | `zl-empty`、`zl-empty-icon`、`zl-empty-title`、`zl-empty-text`、`zl-skeleton`、`zl-spinner` |
 | 数据 | `zl-stats`、`zl-stat`、`zl-stat-label`、`zl-stat-value`、`zl-progress`（内部 `<span style="width:40%">`） |
-| 动效 | `zl-enter`（新出现的块淡入）；系统开启「减少动态效果」时自动关闭 |
+| 动效 | `zl-enter`（新出现的块淡入，只加在第一次出现的块上，见下方提醒）；系统开启「减少动态效果」时自动关闭 |
 
 ## 版式
 
@@ -287,7 +287,7 @@ const bar = (percent) =>
 ### AI 结果（耗时操作）
 
 - 点击后按钮 `aria-busy="true"`，旁边一句 `<span class="zl-muted zl-text-sm">` 说明预计要多久；
-- 结果放进 `zl-card`，正文用 `zl-prose`，要点用列表，新出现的块加 `zl-enter`；
+- 结果放进 `zl-card`，正文用 `zl-prose`，要点用列表，新出现的块加 `zl-enter`（动画在元素插入页面时播放：整块重新渲染、`innerHTML` 重写或 React 换 `key` 都会让它再播一遍。列表刷新、勾选、编辑时不要给已在页面上的块加，只给新增的那一项加）；
 - 失败用 `zl-alert--danger` 显示原因和「重试」。
 
 ### 卡片网格（多个对象并列）
@@ -298,7 +298,7 @@ const bar = (percent) =>
 ## 交付前自查
 
 1. `npm run preview` 打开，亮色、暗色各看一遍（浏览器或系统切换外观）；
-2. 有数据、空、加载中、出错四种状态都能看到合理的界面；
+2. 有数据、空、加载中、出错四种状态都能看到合理的界面（地址加 `?preview=slow` 看加载中、`?preview=error` 看出错；OS 接口和 AI 的示例在 `preview` 模块的 `OS_SAMPLE` 里，可以写成按请求返回的函数）；
 3. 窗口缩窄到 400px 左右不出现横向滚动、按钮不挤成两行；
 4. 只用 `--zl-*` 变量取色；每屏最多一个 `zl-btn--primary`；
 5. 部署后在 zleapOS 里打开再看一眼（真实数据量、真实错误提示）。

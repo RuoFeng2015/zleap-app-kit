@@ -3,6 +3,8 @@
  * 方便调样式、截图自查。只在独立打开时启用；在 zleapOS 窗口里永远连真实数据，出错就如实显示。
  *
  * 示例数据写在下面的 SAMPLE / OS_SAMPLE：新增集合或调用新的 OS 接口时，顺手补一份样例，预览才看得到内容。
+ * OS_SAMPLE 的值可以是函数，按请求体返回不同结果（AI 生成、写接口都能这样预览）。
+ * 地址加 `?preview=error` 让所有调用失败、`?preview=slow` 让每次调用慢 3 秒，用来检查出错 / 加载中状态。
  */
 type Row = Record<string, unknown> & { _id: string; _version: string };
 type Query = { field?: string; dir?: 'asc' | 'desc'; skip: number; limit: number; where: Record<string, unknown> };
@@ -16,12 +18,29 @@ const SAMPLE: Record<string, Record<string, unknown>[]> = {
   ],
 };
 
-/** OS 接口样例：键是「方法 路径（不含查询串）」，值是接口 data 字段。未列出的接口返回空列表。 */
-const OS_SAMPLE: Record<string, unknown> = {
+type OsRequest = { body: Record<string, unknown>; query: URLSearchParams };
+
+/**
+ * OS 接口样例：键是「方法 路径（不含查询串）」，值是接口 data 字段，或按请求返回 data 的函数。
+ * 未列出的 GET 返回空列表；未列出的 POST / PUT / PATCH 把请求体加上 id 原样返回；DELETE 返回 null。
+ */
+const OS_SAMPLE: Record<string, unknown | ((req: OsRequest) => unknown)> = {
   'GET /todos': { list: [], total: 0 },
+  // AI 生成：传了 output_schema 时 result 是结构化结果，否则只有 text。按你的 Schema 改成像样的示例。
+  'POST /agents/complete': ({ body }: OsRequest) =>
+    body.output_schema
+      ? { text: '', result: { summary: '（预览）这是一段示例结果', items: [] } }
+      : { text: `（预览）根据「${String(body.input ?? '').slice(0, 20)}」生成的示例内容`, result: null },
 };
 
-const wait = () => new Promise((done) => setTimeout(done, 200));
+const mode = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get('preview') ?? '';
+  } catch {
+    return '';
+  }
+})();
+const wait = () => new Promise((done) => setTimeout(done, mode === 'slow' ? 3000 : 200));
 let serial = 0;
 const stores = new Map<string, Row[]>();
 const listeners = new Map<string, Set<() => void>>();
@@ -49,6 +68,7 @@ function builder(name: string, query: Query) {
     limit: (limit: number) => next({ limit }),
     async get() {
       await wait();
+      if (mode === 'error') throw Object.assign(new Error('（预览）模拟的读取错误'), { errCode: 'RUNTIME_UNAVAILABLE' });
       let rows = store(name).filter((row) => Object.entries(query.where).every(([key, value]) => row[key] === value));
       if (query.field) {
         const field = query.field;
@@ -104,13 +124,31 @@ function collection(name: string) {
 
 export const previewDatabase = { collection };
 
-/** zl.cloud.os.api.fetch 的预览版：返回 { code: 0, data } 形状的 Response。 */
+/** zl.cloud.os.api.fetch 的预览版：返回 { code, message, data } 形状的 Response。 */
 export async function previewApiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   await wait();
-  const key = `${(init.method ?? 'GET').toUpperCase()} ${path.split('?')[0]}`;
-  const data = key in OS_SAMPLE ? OS_SAMPLE[key] : { list: [], total: 0 };
-  return new Response(JSON.stringify({ code: 0, message: 'preview', data }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const method = (init.method ?? 'GET').toUpperCase();
+  const [pathname, search = ''] = path.split('?');
+  const json = (status: number, payload: unknown) =>
+    new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } });
+  if (mode === 'error') return json(500, { code: 50000, message: '（预览）模拟的接口错误', data: null });
+  let body: Record<string, unknown> = {};
+  try {
+    body = typeof init.body === 'string' && init.body ? (JSON.parse(init.body) as Record<string, unknown>) : {};
+  } catch {
+    /* 非 JSON 请求体按空对象处理 */
+  }
+  const key = `${method} ${pathname}`;
+  const sample = OS_SAMPLE[key];
+  const data =
+    typeof sample === 'function'
+      ? (sample as (req: OsRequest) => unknown)({ body, query: new URLSearchParams(search) })
+      : key in OS_SAMPLE
+        ? sample
+        : method === 'GET'
+          ? { list: [], total: 0 }
+          : method === 'DELETE'
+            ? null
+            : { id: `preview-${++serial}`, ...body };
+  return json(200, { code: 0, message: 'preview', data });
 }

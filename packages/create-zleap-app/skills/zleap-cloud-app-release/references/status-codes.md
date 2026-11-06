@@ -186,19 +186,21 @@
 `zl.app`（更新管理器）和 `zl.auth`（授权登录）失败时抛出的是 `AppError`（不是 `CloudError`），只有 `errCode` 和 `message`。
 详见 版本更新与授权登录（文档站 ./app-runtime#错误码）。
 
-| errCode                 | 含义                                                     | 处理                                 |
-| ----------------------- | -------------------------------------------------------- | ------------------------------------ |
-| `AUTH_DENIED`           | 用户在系统授权框里点了「拒绝」，或 24 小时内拒绝过这些项 | 按未授权处理，等用户主动操作时再申请 |
-| `AUTH_IN_PROGRESS`      | 授权框已打开，又发起了一次 `authorize`                   | 等上一次结果                         |
-| `AUTH_GESTURE_REQUIRED` | 需要弹授权框，但不是在用户点击 / 按键之后调用            | 放到按钮点击事件里调用               |
-| `AUTH_SCOPE_UNDECLARED` | 申请了 Manifest `host_api.requires` 没声明的 `user.*`    | 补上声明，重新上传                   |
-| `SCHEMA_INVALID`        | `scopes` 为空或含其他值，或 `reason` 超过 60 字          | 改代码                               |
-| `OPEN_IN_ZLEAP_OS`      | 不在 zleapOS 窗口里打开                                  | 部署后从启动台打开                   |
-| `HOST_UNAVAILABLE`      | 宿主 15 秒内没有响应                                     | 升级 zleapOS 后重试                  |
-| `RUNTIME_UNAVAILABLE`   | 通道已关闭或平台接口暂不可用                             | 稍后重试；仍失败时重新打开应用       |
-| `CALL_TIMEOUT`          | 调用超时                                                 | 可以重试                             |
-| `UPDATE_FAILED`         | `applyUpdate()` 切换失败                                 | 提示用户重新打开应用或到应用中心更新 |
-| `UNSUPPORTED_OPERATION` | 宿主不支持这个方法                                       | 升级 zleapOS                         |
+| errCode                      | 含义                                                               | 处理                                 |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------------ |
+| `AUTH_DENIED`                | 用户在系统授权框里点了「拒绝」，或 24 小时内拒绝过这些项           | 按未授权处理，等用户主动操作时再申请 |
+| `AUTH_IN_PROGRESS`           | 授权框已打开，又发起了一次 `authorize`                             | 等上一次结果                         |
+| `AUTH_GESTURE_REQUIRED`      | 需要弹授权框，但不是在用户点击 / 按键之后调用                      | 放到按钮点击事件里调用               |
+| `AUTH_SCOPE_UNDECLARED`      | 申请了 Manifest `host_api.requires` 没声明的 `user.*`              | 补上声明，重新上传                   |
+| `CLIPBOARD_GESTURE_REQUIRED` | `zl.app.setClipboardData` 不是在用户点击 / 按键之后调用            | 放到按钮点击事件里调用               |
+| `SCOPE_FORBIDDEN`            | `setClipboardData` 时 `host_api.requires` 没声明 `clipboard.write` | 补上声明，重新上传                   |
+| `SCHEMA_INVALID`             | `scopes` 为空或含其他值，或 `reason` 超过 60 字                    | 改代码                               |
+| `OPEN_IN_ZLEAP_OS`           | 不在 zleapOS 窗口里打开                                            | 部署后从启动台打开                   |
+| `HOST_UNAVAILABLE`           | 宿主 15 秒内没有响应                                               | 升级 zleapOS 后重试                  |
+| `RUNTIME_UNAVAILABLE`        | 通道已关闭或平台接口暂不可用                                       | 稍后重试；仍失败时重新打开应用       |
+| `CALL_TIMEOUT`               | 调用超时                                                           | 可以重试                             |
+| `UPDATE_FAILED`              | `applyUpdate()` 切换失败                                           | 提示用户重新打开应用或到应用中心更新 |
+| `UNSUPPORTED_OPERATION`      | 宿主不支持这个方法                                                 | 升级 zleapOS                         |
 
 ## 打开应用时的错误
 

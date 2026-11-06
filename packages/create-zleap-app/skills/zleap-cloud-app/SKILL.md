@@ -27,12 +27,12 @@ React 模板、vanilla 模板、原生模板走同一条路线。目的是不重
 
 1. **先查当前用户能用什么**（项目里已配好 MCP 服务 `zleap-app`，见 `.mcp.json`；没登录时 MCP 工具会报未登录，请用户先 `npm run login`）：
    - `os_business_search(query)`：按需求搜索当前账号有权限的 OS 接口（待办、文件、日程、项目、AI 生成文字、定时任务……），中文、英文关键词各搜一次。**先看返回的 `page_api.enabled`**：`false` 表示这个部署没开放页面 API，页面里 `api.fetch` 一律失败，改用 SDK 能力、集合或云函数，并告诉用户；
-   - `os_business_get(operation)`：读契约和页面写法 `page_call`（`page_unavailable` 非空表示页面不能直接调，结果里给替代方案）；
+   - `os_business_get(operation)`：读契约和页面写法 `page_call`（`page_unavailable` 非空表示页面不能直接调，结果里给替代方案）。操作键是「方法 + 完整路径」，如 `POST /api/v1/agents/complete`，写错时报错里会给出可能的键；字段的取值和单位看 Schema 里的 `description`（如待办 `status` 只有 todo / done，OS 接口的时间是**秒级**时间戳，而 `Date.now()` 和云数据库是毫秒）；
    - `os_business_call(operation, input)`：用用户自己的账号试调。读接口直接调；**写 / 删接口先传 `dry_run: true`**（只校验参数、预览请求，不写数据），真正调用会改用户的真实数据，要调就先告诉用户、试完删掉；
-   - 页面里要 AI 生成内容：用 `POST /agents/complete`（要 JSON 传 `output_schema`，结果在 `data.result`；涉及日期把今天和两周日历写进提示词；Schema 会随 system 发给模型，可选值用 `enum` 限定、代码再核对；模型耗时波动大，界面写「通常 30–90 秒」并显示已等待秒数，`timeout_ms` 是整次上限（服务端最多 110 秒，超时 40049、`data.reason=timeout`），`max_retries` 0–1，失败给「重试」按钮）。没有页面参与（定时、触发器）才用后台能力 `os.agent.complete`。写法见文档「Cloud SDK 使用 → 调用 AI 生成内容」；
+   - 页面里要 AI 生成内容：用 `POST /agents/complete`（要 JSON 传 `output_schema`，结果在 `data.result`；涉及日期把今天和两周日历写进提示词；Schema 会随 system 发给模型，可选值用 `enum` 限定、代码再核对；模型耗时波动大，界面写「通常 30–90 秒」并显示已等待秒数，`timeout_ms` 是整次上限（服务端最多 110 秒，超时 40049、`data.reason=timeout`），`max_retries` 0–1，失败给「重试」按钮；生成不写数据，超时提示「生成超时」即可，不要说「保存结果未知」）。没有页面参与（定时、触发器）才用后台能力 `os.agent.complete`。写法见文档「Cloud SDK 使用 → 调用 AI 生成内容」；
    - `app_capabilities_search` / `app_capability_get`：平台后台能力；`app_sdk_get` / `zleap://sdk/guide`：SDK 能力与类型；`app_spec_get(section=model)`：Manifest 字段。
 2. **OS 已有的数据和功能直接用**：页面里 `zl.cloud.os.api.fetch('/路径')`（不带 `/api/v1`），按使用者权限执行，不要在应用里另存一份。
-   `api.fetch` 不依赖云环境：**只调 OS 接口、没有集合 / 云函数 / 云文件的应用，不要调用 `zl.cloud.init` 和 `zl.cloud.os.ready()`**（这类应用平台不准备云环境，`ready()` 会报 `ENV_FORBIDDEN`），连接状态以第一次 `api.fetch` 成功为准。模板里的 `init`/`ready` 是给云数据库用的，删掉集合时一并删掉。
+   `api.fetch` 不依赖云环境：**只调 OS 接口、没有集合 / 云函数 / 云文件的应用，不要调用 `zl.cloud.init` 和 `zl.cloud.os.ready()`**（这类应用平台不准备云环境，`ready()` 会报 `ENV_FORBIDDEN`），连接状态以第一次 `api.fetch` 成功为准。模板里的 `init`/`ready` 是给云数据库用的，删掉集合时一并删掉。集合和 OS 接口混用时两边分开降级：数据库没就绪时 OS 数据照常显示，只在用到集合的区块提示稍后重试。
 3. **应用自己产生的数据才建集合**（`db.collection`，在 manifest 声明）。
 4. **以上都没有的后端逻辑才写云函数**（references/cloud-functions.md）。云函数不能调 OS 接口，需要 OS 数据时由页面取到后传入。
 
@@ -57,7 +57,7 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 
 1. **一切先在 manifest 声明**：集合 `data.collections` + 结构 `data.schemas`；权限 `runtime.capabilities.requires`。没声明的拿不到。
 2. **集合结构上线即固定**：已建集合不随新版本更新 Schema；`additionalProperties` 缺省按 `false`；集合键 `^[a-z][a-z0-9_]{0,63}$`，不能用 `sys_`/`ac_`/`t_` 前缀。要改字段 → 新集合 + 迁移。动手改 schema 前先告诉用户这一点。
-3. **沙箱**：opaque origin，CSP `connect-src 'none'`、`worker-src 'none'`、脚本/样式/字体只能来自包内。所以：不能 `fetch`/XHR/WebSocket、不能用 CDN 或在线字体、不能用 `localStorage`/`sessionStorage`/`indexedDB`、不能 `alert/confirm/prompt`、不能开 Worker、不能弹新窗口。状态放内存或云数据库。
+3. **沙箱**：opaque origin，CSP `connect-src 'none'`、`worker-src 'none'`、脚本/样式/字体只能来自包内。所以：不能 `fetch`/XHR/WebSocket、不能用 CDN 或在线字体、不能用 `localStorage`/`sessionStorage`/`indexedDB`、不能 `alert/confirm/prompt`、不能开 Worker、不能弹新窗口，`navigator.clipboard` 也不可用（复制用 `zl.app.setClipboardData({ data })`，manifest `host_api.requires` 声明 `clipboard.write`，在用户点击时调用）。状态放内存或云数据库。
 4. **环境由宿主决定**：用云数据库 / 云函数 / 云文件时 `zl.cloud.init({ env: zl.cloud.DYNAMIC_CURRENT_ENV })`，绝不写死 `'dev'`/`'prod'`；只用 OS 接口的应用不调 `init`/`ready()`（见上文开发顺序第 2 条）。
 5. **读取上限**：单次 `limit` ≤ 100，`skip` ≤ 1000，用分页；查询有筛选/排序但没索引时可能 `INDEX_REQUIRED`。
 6. **乐观锁**：`update`/`remove` 带 `agentos: { expectedVersion: doc._version }`；冲突 `VERSION_CONFLICT` → 重读再改。

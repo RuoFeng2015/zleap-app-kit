@@ -575,7 +575,7 @@ Manifest 校验器接受 `^[a-zA-Z][a-zA-Z0-9_.-]*$`（≤128），但**数据�
 
 | 值                      | 安装确认时的文案                                 | 说明                                                                                                             |
 | ----------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| `clipboard.write`       | 写入剪贴板                                       | 宿主桥支持该能力，但当前 SDK 的 `connectHostedApp()` 没有提供剪贴板方法（只有 `kv`、`files`、`close`）           |
+| `clipboard.write`       | 写入剪贴板                                       | 用 `zl.app.setClipboardData({ data })`，须在用户点击时调用，见 SDK · 复制到剪贴板（文档站 /guide/sdk#复制到剪贴板）     |
 | `workspace.files`       | 读取及整理选定空间文件夹内的文件                 | 配合模板里的 `sdk/workspace.js` 使用；用户在运行时选择文件夹                                                     |
 | `workspace.images.read` | （安装确认显示原始 ID）                          | 读取选定文件夹里的图片：`workspace.readImage(handle, fileId, expectedVersion)`；必须同时声明 `workspace.files`   |
 | `credentials.use`       | （安装确认文案未核实）                           | 使用钥匙串里的登录凭据；当前 SDK 未提供封装，本文档站暂不展开用法                                                |

@@ -29,7 +29,7 @@ my-todo/
     ├── index.js / index.d.ts          # zl.cloud：数据库、文件、后台调用（本页）
     ├── execution.js / files.js / values.js / protocol.js / transport.js（及 .d.ts）
     ├── workspace.js / workspace.d.ts  # 工作区文件（host_api.requires: workspace.files；读图片另需 workspace.images.read）
-    └── zleap-sdk.js / zleap-sdk.d.ts  # 宿主 SDK：connectHostedApp()（kv、files、close；不含剪贴板封装）
+    └── zleap-sdk.js / zleap-sdk.d.ts  # 宿主 SDK：connectHostedApp()（kv、files、close；剪贴板用 zl.app.setClipboardData）
 ```
 
 SDK 版本与 `zleap-app` 可执行文件一起发布。用 `npm create zleap-app` 生成的 React 项目改为依赖 npm 包

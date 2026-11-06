@@ -315,7 +315,7 @@ Cloud 授权的键形如 `cloud.database.dev.read`，记录在**这个安装的�
 
 | 能力                    | 说明                             | 用法                                                                                                                                      |
 | ----------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `clipboard.write`       | 写入剪贴板                       | 宿主桥支持这个能力，但当前 SDK 的 `connectHostedApp()` 只有 `kv`、`files`、`close`，**没有剪贴板方法**；本文档站暂不提供调用示例          |
+| `clipboard.write`       | 写入剪贴板                       | 用 `zl.app.setClipboardData({ data })`，须在用户点击时调用，见 SDK · 复制到剪贴板（文档站 /guide/sdk#复制到剪贴板）                              |
 | `workspace.files`       | 读取及整理选定空间文件夹内的文件 | 模板里的 `sdk/workspace.js`；运行时由用户选择工作文件夹                                                                                   |
 | `workspace.images.read` | 读取选定文件夹里的图片           | 需同时声明 `workspace.files`；`workspace.readImage(handle, fileId, expectedVersion)` 返回校验过的图片 Blob（JPEG/PNG/GIF/WebP，≤ 20 MiB） |
 | `credentials.use`       | 使用钥匙串里的登录凭据           | 宿主桥能力；当前 SDK 未提供封装，本文档站暂不展开                                                                                         |
