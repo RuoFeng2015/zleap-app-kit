@@ -8,6 +8,8 @@
  */
 import { CloudError, zl, type Capabilities } from '@zleap-ai/app-sdk';
 
+import { previewApiFetch, previewDatabase } from './preview';
+
 export { CloudError };
 export type { Capabilities };
 export type { Document } from '@zleap-ai/app-sdk';
@@ -15,12 +17,12 @@ export type { Document } from '@zleap-ai/app-sdk';
 export type ConnectionState =
   | { status: 'connecting' }
   | { status: 'ready'; capabilities: Capabilities }
-  | { status: 'standalone' }
+  | { status: 'preview' }
   | { status: 'error'; code: string };
 
 let connection: Promise<Capabilities> | null = null;
 
-/** 浏览器直接打开（npm run dev）时没有宿主窗口，SDK 握手只会超时。 */
+/** 浏览器直接打开（npm run preview / dev）时没有宿主窗口：进入预览模式，用 ./preview.ts 的示例数据。 */
 export function isStandalone(): boolean {
   try {
     return window.parent === window;
@@ -29,7 +31,11 @@ export function isStandalone(): boolean {
   }
 }
 
-/** 与宿主握手一次；失败后允许重新尝试。 */
+/**
+ * 与宿主握手一次；失败后允许重新尝试。
+ * 只给云数据库、云函数、云文件用：应用只调 OS 接口（zl.cloud.os.api.fetch）时不要调用它，
+ * 平台没为这类应用准备云环境，ready() 会报 ENV_FORBIDDEN。
+ */
 export function connect(): Promise<Capabilities> {
   if (!connection) {
     zl.cloud.init({ env: zl.cloud.DYNAMIC_CURRENT_ENV });
@@ -41,8 +47,16 @@ export function connect(): Promise<Capabilities> {
   return connection;
 }
 
-export function database() {
+export function database(): ReturnType<typeof zl.cloud.database> {
+  // 预览模式只在没有宿主时启用；在 zleapOS 窗口里永远是真实数据。
+  if (isStandalone()) return previewDatabase as unknown as ReturnType<typeof zl.cloud.database>;
   return zl.cloud.database();
+}
+
+/** 调 OS 已有接口（路径相对 /api/v1）。不依赖云环境，只调 OS 接口的应用不需要 connect()。 */
+export function osFetch(path: string, init?: RequestInit): Promise<Response> {
+  if (isStandalone()) return previewApiFetch(path, init);
+  return zl.cloud.os.api.fetch(path, init);
 }
 
 /** 是否协商到了某个能力档（如 document-core/1、storage-object/1、app-execution/1）。 */

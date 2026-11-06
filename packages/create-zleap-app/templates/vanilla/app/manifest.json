@@ -3,7 +3,7 @@
   "appid": "__APPID__",
   "name": "__APP_NAME__",
   "version": "1.0.0",
-  "description": "不用构建的原生网页应用，数据保存在 zleapOS App Cloud 的个人待办。",
+  "description": "不用构建的原生网页应用，待办保存在本应用自己的云数据库集合 todos。",
   "execution": "foreground",
   "host_api": { "profile": "app-runtime/2" },
   "runtime": {

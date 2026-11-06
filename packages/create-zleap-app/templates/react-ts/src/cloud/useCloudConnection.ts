@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { connect, errorCode, isStandalone, type ConnectionState } from './client';
 
-/** 连接宿主的状态机：standalone（浏览器独立预览）/ connecting / ready / error。 */
+/** 连接宿主的状态机：preview（浏览器独立打开，示例数据）/ connecting / ready / error。 */
 export function useCloudConnection() {
   const [state, setState] = useState<ConnectionState>(() =>
-    isStandalone() ? { status: 'standalone' } : { status: 'connecting' },
+    isStandalone() ? { status: 'preview' } : { status: 'connecting' },
   );
 
   const retry = useCallback(() => {

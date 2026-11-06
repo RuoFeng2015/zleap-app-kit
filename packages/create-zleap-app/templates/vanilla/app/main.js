@@ -1,14 +1,24 @@
-// 应用页面：运行在 zleapOS 的沙箱 iframe 里。Cloud SDK 由 npm run deploy / npm install 从
-// node_modules/@zleap-ai/app-sdk 复制到 ./sdk/，不要手改 ./sdk/。
+// 应用页面：运行在 zleapOS 的沙箱 iframe 里。Cloud SDK 与官方样式 zleap.css 由 npm run deploy / npm install
+// 从 node_modules/@zleap-ai/app-sdk 复制到 ./sdk/，不要手改 ./sdk/。
 //
-// 平台约束（不要绕过）：不能 fetch、不能用 localStorage、不能 alert；环境用 DYNAMIC_CURRENT_ENV；
+// 平台约束（不要绕过）：不能 fetch、不能用 localStorage、不能 alert / confirm；环境用 DYNAMIC_CURRENT_ENV；
 // 每次读最多 100 条，用 skip 翻页；更新 / 删除带 expectedVersion；COMMIT_UNKNOWN 时先刷新核对，不要自动重试。
+//
+// 界面：用 zleap.css 的 zl- 类；每块数据处理四种状态——加载中（骨架）、出错（说明 + 重试）、空（引导下一步）、有数据。
+// 浏览器直接打开（npm run preview）是预览模式，数据来自 ./preview.js 的示例；在 zleapOS 里永远是真实数据。
 import { CloudError, zl } from './sdk/index.js';
+import { isPreview, previewDatabase } from './preview.js';
 
 const COLLECTION = 'todos'; // 结构在 manifest.json 的 data.schemas.todos
 const PAGE_SIZE = 100;
 
 const $ = (id) => document.getElementById(id);
+const db = () => (isPreview ? previewDatabase : zl.cloud.database());
+const todos = () => db().collection(COLLECTION);
+
+let rows = [];
+let filter = 'all';
+let busy = false;
 
 /** 面向用户的中文说明；宿主只给错误码，未知错误码原样展示。 */
 function describeError(error) {
@@ -29,12 +39,36 @@ function describeError(error) {
   return hints[code] ? `${hints[code]}（${code}）` : code;
 }
 
-function showError(error) {
-  $('error').textContent = error ? describeError(error) : '';
+function showError(error, title = '出了点问题') {
   $('error').hidden = !error;
+  if (!error) return;
+  $('error-title').textContent = title;
+  $('error-text').textContent = describeError(error);
 }
 
-const todos = () => zl.cloud.database().collection(COLLECTION);
+function setStatus(state, text) {
+  $('status').dataset.state = state;
+  $('status').textContent = text;
+}
+
+/** 操作成功的轻提示，2 秒后消失（沙箱里不能用 alert）。 */
+function toast(text) {
+  document.querySelector('.zl-toast')?.remove();
+  const node = document.createElement('div');
+  node.className = 'zl-toast';
+  node.setAttribute('role', 'status');
+  node.textContent = text;
+  document.body.append(node);
+  setTimeout(() => node.remove(), 2000);
+}
+
+function formatTime(ms) {
+  if (!ms) return '';
+  const date = new Date(ms);
+  return date.toDateString() === new Date().toDateString()
+    ? `今天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+    : date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+}
 
 async function listTodos(maxPages = 10) {
   const out = [];
@@ -46,71 +80,142 @@ async function listTodos(maxPages = 10) {
   return out;
 }
 
-function render(rows) {
-  const list = $('list');
-  list.replaceChildren();
-  for (const row of rows) {
-    const item = document.createElement('li');
-    item.className = row.done ? 'done' : '';
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = Boolean(row.done);
-    box.addEventListener('change', () =>
-      mutate(() => todos().doc(row._id).update({ data: { done: box.checked }, agentos: { expectedVersion: row._version } })),
+function button(text, className, onClick) {
+  const node = document.createElement('button');
+  node.type = 'button';
+  node.className = `zl-btn zl-btn--sm ${className}`;
+  node.textContent = text;
+  node.disabled = busy;
+  node.addEventListener('click', onClick);
+  return node;
+}
+
+function renderRow(row) {
+  const item = document.createElement('li');
+  item.className = `zl-list-item${row.done ? ' is-done' : ''}`;
+
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.className = 'zl-check';
+  box.checked = Boolean(row.done);
+  box.disabled = busy;
+  box.setAttribute('aria-label', `完成：${row.title}`);
+  box.addEventListener('change', () =>
+    mutate(
+      () => todos().doc(row._id).update({ data: { done: box.checked }, agentos: { expectedVersion: row._version } }),
+      box.checked ? '已完成' : '已恢复',
+    ),
+  );
+
+  const main = document.createElement('div');
+  main.className = 'zl-item-main';
+  const title = document.createElement('span');
+  title.className = 'zl-item-title';
+  title.textContent = String(row.title ?? '');
+  const meta = document.createElement('span');
+  meta.className = 'zl-item-meta';
+  meta.textContent = formatTime(row.created_at);
+  main.append(title, meta);
+
+  // 沙箱里不能用 confirm()：危险操作用行内二次确认。
+  const actions = document.createElement('div');
+  actions.className = 'zl-item-actions zl-item-actions--hover';
+  const askRemove = button('删除', 'zl-btn--ghost', () => {
+    actions.className = 'zl-item-actions';
+    actions.replaceChildren(
+      button('确认删除', 'zl-btn--danger', () =>
+        mutate(() => todos().doc(row._id).remove({ agentos: { expectedVersion: row._version } }), '已删除'),
+      ),
+      button('取消', 'zl-btn--ghost', () => render()),
     );
-    const title = document.createElement('span');
-    title.textContent = String(row.title ?? '');
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.textContent = '删除';
-    remove.addEventListener('click', () => mutate(() => todos().doc(row._id).remove({ agentos: { expectedVersion: row._version } })));
-    item.append(box, title, remove);
-    list.append(item);
-  }
-  $('empty').hidden = rows.length > 0;
+  });
+  actions.append(askRemove);
+
+  item.append(box, main, actions);
+  return item;
+}
+
+function render() {
+  const visible = rows.filter((row) => (filter === 'all' ? true : filter === 'done' ? row.done : !row.done));
+  const done = rows.filter((row) => row.done).length;
+  $('summary').textContent = rows.length ? `${done} / ${rows.length} 已完成` : '';
+  $('list').replaceChildren(...visible.map(renderRow));
+  $('list').hidden = visible.length === 0;
+  $('empty').hidden = visible.length > 0;
+  $('empty-title').textContent = rows.length === 0 ? '还没有待办' : '这里没有内容';
+  $('empty-text').textContent = rows.length === 0 ? '在上面写下第一件想完成的事。' : '换个筛选条件看看。';
+  for (const node of $('filters').querySelectorAll('button')) node.setAttribute('aria-pressed', String(node.dataset.filter === filter));
 }
 
 async function refresh() {
   try {
-    render(await listTodos());
+    rows = await listTodos();
     showError(null);
   } catch (error) {
-    showError(error);
+    rows = [];
+    showError(error, '读取失败');
   }
+  $('loading').hidden = true;
+  render();
 }
 
-async function mutate(action) {
+async function mutate(action, success) {
+  if (busy) return;
+  busy = true;
+  $('add-button').setAttribute('aria-busy', 'true');
   try {
     await action();
+    toast(success);
   } catch (error) {
-    showError(error);
+    showError(error, '操作失败');
   }
+  busy = false;
+  $('add-button').removeAttribute('aria-busy');
   await refresh();
 }
 
-async function main() {
-  // 浏览器直接打开（不在 zleapOS 窗口里）时没有宿主，握手只会超时。
-  if (window.parent === window) {
-    $('status').textContent = '请从 zleapOS 启动台打开';
-    return;
+async function connect() {
+  if (isPreview) {
+    setStatus('preview', '预览模式');
+    $('preview').hidden = false;
+    return true;
   }
+  // init / ready 只给云数据库、云函数、云文件用。应用只调 OS 接口（zl.cloud.os.api.fetch）时删掉这两步，
+  // 否则平台没为它准备云环境，ready() 会报 ENV_FORBIDDEN。
   zl.cloud.init({ env: zl.cloud.DYNAMIC_CURRENT_ENV });
   try {
     await zl.cloud.os.ready();
-    $('status').textContent = '● OS 已连接';
-    $('status').classList.add('ready');
+    setStatus('ready', '已连接 zleapOS');
+    showError(null);
+    return true;
   } catch (error) {
-    $('status').textContent = '连接失败';
-    showError(error);
-    return;
+    setStatus('error', '连接失败');
+    $('loading').hidden = true;
+    showError(error, '连接 zleapOS 失败');
+    return false;
   }
+}
+
+async function main() {
+  $('retry').addEventListener('click', async () => {
+    showError(null);
+    if (await connect()) await refresh();
+  });
+  $('filters').addEventListener('click', (event) => {
+    const value = event.target.closest('button')?.dataset.filter;
+    if (!value) return;
+    filter = value;
+    render();
+  });
   $('add').addEventListener('submit', (event) => {
     event.preventDefault();
     const title = $('title').value.trim();
     if (!title) return;
     $('title').value = '';
-    mutate(() => todos().add({ data: { title, done: false, created_at: Date.now() } }));
+    mutate(() => todos().add({ data: { title, done: false, created_at: Date.now() } }), '已添加');
   });
+  if (!(await connect())) return;
+  todos().onChange?.(() => refresh());
   await refresh();
 }
 

@@ -4,21 +4,63 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>__APP_NAME__</title>
+    <!-- 官方样式：与 zleapOS 桌面同色、自动跟随亮 / 暗；部署时从 @zleap-ai/app-sdk 复制到 ./sdk/。应用自己的样式写在 style.css。 -->
+    <link rel="stylesheet" href="./sdk/zleap.css" />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main class="app">
-      <header>
-        <h1>__APP_NAME__</h1>
-        <span id="status" class="status">连接中…</span>
+    <main class="zl-page">
+      <header class="zl-header">
+        <div>
+          <h1 class="zl-title">__APP_NAME__</h1>
+          <p class="zl-subtitle">记下要做的事，完成后勾掉。</p>
+        </div>
+        <span id="status" class="zl-status" data-state="connecting">正在连接</span>
       </header>
-      <form id="add" class="add" autocomplete="off">
-        <input id="title" maxlength="200" placeholder="要做什么？" required />
-        <button type="submit">添加</button>
+
+      <div id="preview" class="zl-alert zl-alert--info" role="status" hidden>
+        <div>
+          <strong>预览模式 · 示例数据</strong>
+          没有连接 zleapOS，改动不会保存。部署（<code>npm run deploy</code>）后从启动台打开才是真实数据。
+        </div>
+      </div>
+
+      <div id="error" class="zl-alert zl-alert--danger" role="alert" hidden>
+        <div>
+          <strong id="error-title">出了点问题</strong>
+          <span id="error-text"></span>
+        </div>
+        <button id="retry" class="zl-btn zl-btn--sm" type="button">重试</button>
+      </div>
+
+      <form id="add" class="zl-composer" autocomplete="off">
+        <input id="title" class="zl-input" maxlength="200" placeholder="下一件想完成的事…" aria-label="新待办" required />
+        <button id="add-button" class="zl-btn zl-btn--primary" type="submit">添加</button>
       </form>
-      <p id="error" class="error" role="alert" hidden></p>
-      <ul id="list" class="list"></ul>
-      <p id="empty" class="empty" hidden>还没有待办。</p>
+
+      <section class="zl-section">
+        <div class="zl-section-title">
+          <div id="filters" class="zl-segmented" role="group" aria-label="筛选">
+            <button type="button" data-filter="all" aria-pressed="true">全部</button>
+            <button type="button" data-filter="active" aria-pressed="false">未完成</button>
+            <button type="button" data-filter="done" aria-pressed="false">已完成</button>
+          </div>
+          <span id="summary" class="zl-num zl-text-sm"></span>
+        </div>
+
+        <!-- 四种状态：加载中（骨架）/ 出错（上面的 #error）/ 空 / 有数据 -->
+        <ul id="loading" class="zl-list" aria-busy="true" aria-label="正在读取">
+          <li class="zl-list-item"><span class="zl-skeleton" style="width: 18px; height: 18px"></span><span class="zl-skeleton" style="width: 68%"></span></li>
+          <li class="zl-list-item"><span class="zl-skeleton" style="width: 18px; height: 18px"></span><span class="zl-skeleton" style="width: 45%"></span></li>
+          <li class="zl-list-item"><span class="zl-skeleton" style="width: 18px; height: 18px"></span><span class="zl-skeleton" style="width: 56%"></span></li>
+        </ul>
+        <ul id="list" class="zl-list" hidden></ul>
+        <div id="empty" class="zl-empty" hidden>
+          <div class="zl-empty-icon" aria-hidden="true">✓</div>
+          <p id="empty-title" class="zl-empty-title">还没有待办</p>
+          <p id="empty-text" class="zl-empty-text">在上面写下第一件想完成的事。</p>
+        </div>
+      </section>
     </main>
     <script type="module" src="./main.js"></script>
   </body>

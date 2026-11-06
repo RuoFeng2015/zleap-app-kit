@@ -243,6 +243,9 @@ test('还没有 appid：npm run login 在授权时新建应用并写回 manifest
     // 已有 appid 时普通登录，不再建应用
     assert.equal(app.run('login', '--target', 'http://127.0.0.1:1').status, 0);
     assert.equal(app.state().createdApps.length, 1);
+    // --browser-timeout 原样转给 CLI（授权要等更久时用）
+    assert.equal(app.run('login', '--target', 'http://127.0.0.1:1', '--browser-timeout', '10m').status, 0);
+    assert.ok(app.state().calls.some((call) => call.startsWith('auth login') && call.endsWith('--browser-timeout 10m')), template);
   }
 });
 
@@ -251,4 +254,16 @@ test('没有 appid 时部署提示先 npm run login', () => {
   const result = app.deploy();
   assert.equal(result.status, 1);
   assert.match(result.stderr + result.stdout, /npm run login/);
+});
+
+test('不用云资源的应用：部署结束不提示开发环境与数据库', () => {
+  const app = project({ cloudEnvironments: [] }, 'zl0123456789abcdef', 'vanilla');
+  const file = join(app.dir, 'app/manifest.json');
+  const m = JSON.parse(readFileSync(file, 'utf8'));
+  delete m.data;
+  m.runtime.capabilities = { requires: [] };
+  writeFileSync(file, JSON.stringify(m, null, 2));
+  const result = app.deploy();
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.doesNotMatch(result.stdout, /开发环境|数据库/);
 });

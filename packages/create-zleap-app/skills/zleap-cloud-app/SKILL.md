@@ -26,11 +26,13 @@ zleapOS 云开发应用 = 一个网页（运行在 zleapOS 桌面的沙箱 ifram
 React 模板、vanilla 模板、原生模板走同一条路线。目的是不重复造轮子、少踩运行时限制：
 
 1. **先查当前用户能用什么**（项目里已配好 MCP 服务 `zleap-app`，见 `.mcp.json`；没登录时 MCP 工具会报未登录，请用户先 `npm run login`）：
-   - `os_business_search(query)`：按需求搜索当前账号有权限的 OS 接口（待办、文件、日程、项目、AI 生成文字、定时任务……），中文、英文关键词各搜一次；
+   - `os_business_search(query)`：按需求搜索当前账号有权限的 OS 接口（待办、文件、日程、项目、AI 生成文字、定时任务……），中文、英文关键词各搜一次。**先看返回的 `page_api.enabled`**：`false` 表示这个部署没开放页面 API，页面里 `api.fetch` 一律失败，改用 SDK 能力、集合或云函数，并告诉用户；
    - `os_business_get(operation)`：读契约和页面写法 `page_call`（`page_unavailable` 非空表示页面不能直接调，结果里给替代方案）；
-   - `os_business_call(operation, input)`：用用户自己的账号试调一次，写接口也要试（会改真实数据，提醒用户用测试账号）；
+   - `os_business_call(operation, input)`：用用户自己的账号试调。读接口直接调；**写 / 删接口先传 `dry_run: true`**（只校验参数、预览请求，不写数据），真正调用会改用户的真实数据，要调就先告诉用户、试完删掉；
+   - 页面里要 AI 生成内容：用 `POST /agents/complete`（要 JSON 传 `output_schema`，结果在 `data.result`；涉及日期把今天和两周日历写进提示词；契约模式可能要 40–60 秒，界面要提示等待）。没有页面参与（定时、触发器）才用后台能力 `os.agent.complete`。写法见文档「Cloud SDK 使用 → 调用 AI 生成内容」；
    - `app_capabilities_search` / `app_capability_get`：平台后台能力；`app_sdk_get` / `zleap://sdk/guide`：SDK 能力与类型；`app_spec_get(section=model)`：Manifest 字段。
 2. **OS 已有的数据和功能直接用**：页面里 `zl.cloud.os.api.fetch('/路径')`（不带 `/api/v1`），按使用者权限执行，不要在应用里另存一份。
+   `api.fetch` 不依赖云环境：**只调 OS 接口、没有集合 / 云函数 / 云文件的应用，不要调用 `zl.cloud.init` 和 `zl.cloud.os.ready()`**（这类应用平台不准备云环境，`ready()` 会报 `ENV_FORBIDDEN`），连接状态以第一次 `api.fetch` 成功为准。模板里的 `init`/`ready` 是给云数据库用的，删掉集合时一并删掉。
 3. **应用自己产生的数据才建集合**（`db.collection`，在 manifest 声明）。
 4. **以上都没有的后端逻辑才写云函数**（references/cloud-functions.md）。云函数不能调 OS 接口，需要 OS 数据时由页面取到后传入。
 
@@ -56,20 +58,34 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 1. **一切先在 manifest 声明**：集合 `data.collections` + 结构 `data.schemas`；权限 `runtime.capabilities.requires`。没声明的拿不到。
 2. **集合结构上线即固定**：已建集合不随新版本更新 Schema；`additionalProperties` 缺省按 `false`；集合键 `^[a-z][a-z0-9_]{0,63}$`，不能用 `sys_`/`ac_`/`t_` 前缀。要改字段 → 新集合 + 迁移。动手改 schema 前先告诉用户这一点。
 3. **沙箱**：opaque origin，CSP `connect-src 'none'`、`worker-src 'none'`、脚本/样式/字体只能来自包内。所以：不能 `fetch`/XHR/WebSocket、不能用 CDN 或在线字体、不能用 `localStorage`/`sessionStorage`/`indexedDB`、不能 `alert/confirm/prompt`、不能开 Worker、不能弹新窗口。状态放内存或云数据库。
-4. **环境由宿主决定**：`zl.cloud.init({ env: zl.cloud.DYNAMIC_CURRENT_ENV })`，绝不写死 `'dev'`/`'prod'`。
+4. **环境由宿主决定**：用云数据库 / 云函数 / 云文件时 `zl.cloud.init({ env: zl.cloud.DYNAMIC_CURRENT_ENV })`，绝不写死 `'dev'`/`'prod'`；只用 OS 接口的应用不调 `init`/`ready()`（见上文开发顺序第 2 条）。
 5. **读取上限**：单次 `limit` ≤ 100，`skip` ≤ 1000，用分页；查询有筛选/排序但没索引时可能 `INDEX_REQUIRED`。
 6. **乐观锁**：`update`/`remove` 带 `agentos: { expectedVersion: doc._version }`；冲突 `VERSION_CONFLICT` → 重读再改。
 7. **结果未知不重试**：`COMMIT_UNKNOWN`（CLI 退出码 6）→ 先重读或查询原操作，绝不自动重复提交。
-8. **明确失败优于假成功**：不要用 mock 数据、假登录、吞错误让界面「看起来能用」。浏览器直接打开（`npm run dev`）时 SDK 连不上宿主是正常的。
+8. **明确失败优于假成功**：在 zleapOS 里不要用 mock 数据、假登录、吞错误让界面「看起来能用」。唯一例外是**预览模式**：浏览器直接打开（`npm run preview`）没有宿主时，模板用 `preview` 模块的示例数据渲染界面并显示「预览模式」横幅；不要把示例数据用到宿主里的失败兜底上。
 9. **凭据**：登录只能由用户在浏览器确认（`npm run login`），不要索要或输入密码，不要读取/打印 `~/.config/zleap-app/session.json`。
+
+## 界面：用官方样式，做完整的状态（外观与功能同样要验收）
+
+应用跑在 zleapOS 桌面窗口里，要和桌面其他应用看起来是一套。**不要写浏览器默认样式的输入框加按钮就交差。**
+
+1. **用官方样式 `zleap.css`**：模板已引入（vanilla `app/sdk/zleap.css`，React `import '@zleap-ai/app-sdk/zleap.css'`）。颜色、圆角、字号与桌面同源，**自动跟随桌面亮 / 暗**。
+   页面骨架 `zl-page` → `zl-header`（`zl-title` + `zl-subtitle` + `zl-status`）→ 若干 `zl-section`；控件用 `zl-btn`（`--primary` 每屏最多一个）、`zl-input` / `zl-textarea`、`zl-segmented`、`zl-list` / `zl-list-item`、`zl-card`、`zl-stats`、`zl-tag`、`zl-alert`、`zl-empty`、`zl-skeleton`、`zl-toast`。
+   全部类与常用版式见 references/ui.md。自己的样式写在 `style.css` / `index.css`，颜色只用 `var(--zl-*)`，**不要写死色值**（暗色会坏）。
+2. **每块数据四种状态都要有**：加载中（`zl-skeleton`，不要空白）、出错（`zl-alert--danger` + 中文说明 + 重试）、空（`zl-empty`：图标 + 一句话 + 下一步）、有数据。
+   操作时按钮 `aria-busy="true"` 防重复提交；成功用 `zl-toast` 轻提示；危险操作行内二次确认（不能用 `confirm`）。AI 生成这类耗时操作要显示进度文字。
+3. **信息层次**：主操作放在最显眼处；次要信息用 `zl-muted` / `zl-item-meta`；数字用 `zl-num`；长文本（AI 结果）用 `zl-prose`。不要所有东西同一个字号、同一个颜色堆在一起。
+4. **原生 `<select>` 在沙箱窗口里体验差**：选项少（≤ 5）用 `zl-segmented`，多的用一组按钮或列表。
+5. **看一眼再交付**：改完界面运行 `npm run preview`（浏览器直接打开，示例数据，亮 / 暗都看），能截图的工具截图自查布局、对齐、空状态；
+   新增集合或 OS 接口时在 `preview` 模块补一份示例数据。功能仍以 `npm run deploy` 后在 zleapOS 里打开为准。
 
 ## 3. 开发一个功能的标准流程
 
 0. **先查现成能力**：按上面「开发路线」用 MCP 查 OS 接口与 SDK，能直接调的就不建集合、不写云函数。
 1. **建模**：在 `manifest.json` 加集合与 strict schema（类型只支持 object/array/string/number/integer/boolean/null，关键字子集见 references/manifest.md）。日期用 `number` 存毫秒，或 `integer` + `"x-agentos-value-type": "date_ms"`。
 2. **权限**：需要的能力加进 `requires`（`cloud.database.read/write`、`cloud.storage.read/write`、`os.agent.complete` 等，白名单外的非可选能力会让应用「暂不可用」）。`reason` 会展示给用户，写具体用途。
-3. **数据层**：React 模板在 `src/cloud/` 下按集合写一个模块（参照 `src/cloud/todos.ts`），组件只调用这些函数；错误用 `describeError()` 展示。
-4. **本地验证**：`npm run typecheck && npm run check`（`check` 通过只代表静态契约，`runtime_test=not_checked`）。
+3. **数据层**：React 模板在 `src/cloud/` 下按集合写一个模块（参照 `src/cloud/todos.ts`），组件只调用这些函数；错误用 `describeError()` 展示。OS 接口用 `osFetch()`（vanilla 用 `zl.cloud.os.api.fetch`），预览模式会自动换成示例数据。
+4. **界面与本地验证**：按上面「界面」一节写界面，`npm run preview` 看效果；再 `npm run typecheck && npm run check`（`check` 通过只代表静态契约，`runtime_test=not_checked`）。
 5. **部署到自己桌面**：`npm run deploy`（构建 → 检查 → 上传开发版本（appid 应用仅成员可见）→ 安装/切换本人安装 → 按平台诊断准备资源；内容变化时自动递增补丁号）。上传之后的步骤由 `zleap-app deploy` 完成，可重复执行，部署记录在 `.zleap/state.json`；不要再手动 publish / install / update 另起一套记录。
    - 报未登录/会话过期 → 请用户运行 `npm run login -- --target <OS 地址>` 并在浏览器核对确认码。
    - 报 `DATA_MIGRATION_REQUIRED` → 新版本改了 data/storage 声明，见第 5 节。
@@ -134,6 +150,7 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 
 ## 6. 参考资料（按需读取，别一次全读）
 
+- references/ui.md — 官方样式 zleap.css 全部类、常用版式（列表、表单、详情、统计、AI 结果）、四种状态写法
 - references/manifest.md — Manifest v2 全字段、集合 Schema 子集、分区与记录规则、打包规则
 - references/sdk-database-files.md — Cloud SDK：初始化与 profile、查询/写入/watch/onChange、文件上传下载、操作编号、COMMIT_UNKNOWN
 - references/cloud-functions.md — 云函数、headless 能力、`os.agent.complete`、`capabilities.invoke` / `jobs.wait`

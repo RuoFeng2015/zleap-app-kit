@@ -11,6 +11,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "preview": "node scripts/zleap.mjs preview",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "check": "npm run build && zleap-app check dist",

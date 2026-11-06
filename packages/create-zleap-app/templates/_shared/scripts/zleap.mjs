@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 项目内的一键命令，封装 zleap-app CLI：
 //
-//   npm run login  [-- --target https://os.example.com]   浏览器授权，保存开发会话（自动续期，最长 30 天）
+//   npm run login  [-- --target https://os.example.com] [--browser-timeout 10m]  浏览器授权，保存开发会话（自动续期，最长 30 天）
 //   npm run deploy [-- --no-build] [--no-install]          构建 → 检查 → zleap-app deploy（上传开发版本 → 安装/切换 → 按诊断准备资源）
 //   npm run status                                        查看本应用的安装、权限与可用版本
 //   npm run versions                                      列出全部成员上传的开发版本、当前线上版本和发布记录
@@ -9,12 +9,14 @@
 //                                                         把开发版本（默认最近一次 deploy 的）发布为线上版本；回退 = 发布旧版本
 //   npm run logs   [-- --environment dev|prod] [--invocation <调用编号>]
 //                                                         查看最近 24 小时应用页面上报的错误与本人云函数日志
+//   npm run preview [-- --port 5180]                      预览模式：浏览器直接打开页面，用示例数据渲染界面（调样式、截图自查）
 //   node scripts/zleap.mjs sdk                            vanilla 模板：把 Cloud SDK 从 node_modules 复制进应用目录
 //
 // 设计约束（与平台一致）：结果未知（COMMIT_UNKNOWN）时不自动重试；不替你做数据迁移；不碰生产环境。
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -152,6 +154,8 @@ async function login() {
     args = ['auth', 'login', '--target', target, '--create-app', '--name', value.name];
   }
   if (has('no-browser')) args.push('--no-browser');
+  // 浏览器授权默认等 5 分钟；需要更久（例如要先找管理员开账号）时用 --browser-timeout 10m。
+  if (option('browser-timeout')) args.push('--browser-timeout', option('browser-timeout'));
   writeJSON(configFile, { ...config, target });
   // 新建应用时要拿到 stdout 里的 appid，授权链接和确认码仍实时显示。
   const result = cli(args, { capture: !appKey, liveStderr: true });
@@ -179,7 +183,7 @@ function syncSdk() {
   const from = join(root, 'node_modules', '@zleap-ai', 'app-sdk', 'dist');
   if (!existsSync(join(from, 'index.js'))) throw new StepError('没有找到 @zleap-ai/app-sdk，请先安装依赖（npm install）。');
   mkdirSync(join(root, project.sdkDir), { recursive: true });
-  for (const file of ['index.js', 'host.js', 'workspace.js']) {
+  for (const file of ['index.js', 'host.js', 'workspace.js', 'zleap.css']) {
     if (existsSync(join(from, file))) copyFileSync(join(from, file), join(root, project.sdkDir, file));
   }
 }
@@ -269,8 +273,19 @@ function cloudStatus(diagnosis) {
   return { dev: keys.includes('dev'), prod: keys.includes('prod'), databaseReady: allocation === 'ready' };
 }
 
+/** manifest 是否用到云资源（集合、cloud.* 权限或后台能力）；用不到时不提示开发环境与数据库。 */
+function needsCloud(value) {
+  const collections = value?.data?.collections;
+  const requires = value?.runtime?.capabilities?.requires;
+  return (
+    (Array.isArray(collections) && collections.length > 0) ||
+    (Array.isArray(requires) && requires.some((item) => String(item?.id ?? '').startsWith('cloud.'))) ||
+    hasBackgroundCapabilities(value)
+  );
+}
+
 function finish(appId, installed, diagnosis = null) {
-  const cloud = cloudStatus(diagnosis);
+  const cloud = needsCloud(readJSON(manifestFile, {})) ? cloudStatus(diagnosis) : null;
   if (cloud) {
     const parts = [`开发环境${cloud.dev ? '已创建' : '未创建'}`, `数据库${cloud.databaseReady ? '已就绪' : '未就绪'}`];
     if (cloud.prod) parts.push('已有生产环境（应用默认运行在生产数据域）');
@@ -284,8 +299,8 @@ function finish(appId, installed, diagnosis = null) {
       `有云函数 / 后台能力：npx zleap-app prepare ${appId} --version-id ${readJSON(stateFile, {}).versionId ?? '<version_id>'} 补做开发环境准备（平台上传时通常已自动签名并绑定，只有自动签名失败时才会走到这一步），再在应用窗口「权限」里允许后台能力。`,
     );
   }
-  if (!cloud || !cloud.dev || !cloud.databaseReady) {
-    steps.push('开发环境或数据库还没就绪：打开「云开发控制台」选中本应用 → 概览，按提示「创建开发环境」/ 等数据库「已就绪」。');
+  if (cloud && (!cloud.dev || !cloud.databaseReady)) {
+    steps.push('开发环境或数据库还没就绪（安装后通常一分钟内自动就绪）：打开「云开发控制台」选中本应用 → 概览，按提示「创建开发环境」/ 等数据库「已就绪」。');
   }
   steps.push('出问题：npm run status 看安装与权限，npm run logs 看页面错误，控制台「运行体检」逐层排查。');
   const manifestValue = readJSON(manifestFile, {});
@@ -379,6 +394,42 @@ function passthrough(args) {
   if (result.code !== 0) process.exitCode = result.code;
 }
 
+/**
+ * 预览模式：不连 zleapOS，用页面里 preview 模块的示例数据把界面渲染出来，方便调样式、截图自查。
+ * 功能是否可用仍以部署后在 zleapOS 里打开为准。React 模板交给 Vite；vanilla 模板用内置静态服务。
+ */
+function preview() {
+  const port = Number(option('port') ?? process.env.PORT ?? 5180);
+  if (project.build) {
+    const vite = join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'vite.cmd' : 'vite');
+    if (!existsSync(vite)) throw new StepError('没有找到 vite，请先安装依赖（npm install）。');
+    const result = spawnSync(vite, ['--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' });
+    process.exitCode = result.status ?? 1;
+    return;
+  }
+  syncSdk();
+  const base = resolve(root, packageDir);
+  const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+  createServer((req, res) => {
+    const path = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
+    let file = normalize(join(base, path));
+    if (file !== base && !file.startsWith(base + sep)) {
+      res.writeHead(403).end();
+      return;
+    }
+    if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
+    if (!existsSync(file)) {
+      res.writeHead(404).end('not found');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': `${types[extname(file).toLowerCase()] ?? 'application/octet-stream'}; charset=utf-8`, 'Cache-Control': 'no-store' });
+    res.end(readFileSync(file));
+  }).listen(port, '127.0.0.1', () => {
+    ok(`预览模式：http://127.0.0.1:${port}/`);
+    console.log('  页面不连 zleapOS，数据来自 preview.js 的示例；改完文件刷新即可。功能以 npm run deploy 后在 zleapOS 里打开为准。按 Ctrl+C 结束。');
+  });
+}
+
 async function main() {
   switch (command) {
     case 'login':
@@ -393,10 +444,12 @@ async function main() {
       return versions();
     case 'release':
       return release();
+    case 'preview':
+      return preview();
     case 'sdk':
       return syncSdk();
     default:
-      console.log('用法：node scripts/zleap.mjs <login|deploy|status|logs|versions|release|sdk>');
+      console.log('用法：node scripts/zleap.mjs <login|deploy|status|logs|versions|release|preview|sdk>');
       process.exitCode = 1;
   }
 }

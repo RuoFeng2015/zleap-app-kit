@@ -12,6 +12,7 @@
     "node": ">=18.17"
   },
   "scripts": {
+    "preview": "node scripts/zleap.mjs preview",
     "check": "node scripts/zleap.mjs sdk && zleap-app check app",
     "pack:zip": "node scripts/zleap.mjs sdk && zleap-app pack app --output out/app.zip",
     "login": "node scripts/zleap.mjs login",

@@ -1,16 +1,5 @@
-:root { color-scheme: light dark; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
-body { margin: 0; background: Canvas; color: CanvasText; }
-.app { max-width: 640px; margin: 0 auto; padding: 24px 16px; }
-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-h1 { font-size: 20px; margin: 0; }
-.status { font-size: 13px; opacity: 0.7; }
-.status.ready { color: #16a34a; opacity: 1; }
-.add { display: flex; gap: 8px; margin: 16px 0; }
-.add input { flex: 1; padding: 8px 10px; font: inherit; }
-button { font: inherit; padding: 6px 12px; cursor: pointer; }
-.error { color: #dc2626; font-size: 14px; }
-.list { list-style: none; padding: 0; margin: 0; }
-.list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
-.list li span { flex: 1; overflow-wrap: anywhere; }
-.list li.done span { text-decoration: line-through; opacity: 0.6; }
-.empty { opacity: 0.6; }
+/*
+ * 应用自己的样式。通用的颜色、按钮、输入框、卡片、列表、提示、空状态都用官方样式 ./sdk/zleap.css 的 zl- 类
+ * （index.html 已引入，与 zleapOS 桌面同色、自动跟随亮 / 暗）。
+ * 需要颜色时用 --zl-* 变量（如 var(--zl-accent)、var(--zl-ink-muted)），不要写死色值，暗色才会正确。
+ */

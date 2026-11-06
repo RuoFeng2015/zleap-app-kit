@@ -28,6 +28,7 @@
       "import": "./dist/workspace.js",
       "default": "./dist/workspace.js"
     },
+    "./zleap.css": "./dist/zleap.css",
     "./package.json": "./package.json"
   },
   "files": [
