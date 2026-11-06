@@ -30,7 +30,7 @@
 | 按钮 | `zl-btn` + `--primary` / `--danger` / `--ghost`，尺寸 `--sm` / `--lg` / `--block`；处理中加 `aria-busy="true"`（自动转圈） |
 | 表单 | `zl-field`、`zl-label`、`zl-hint`、`zl-input`（行内编辑加 `--inline`；原生 `type="date"` 可用）、`zl-textarea`、`zl-select`、`zl-check`、`zl-composer`（一行输入 + 按钮）、`zl-segmented`（按钮带 `aria-pressed`）；出错加 `aria-invalid="true"` |
 | 列表 | `zl-list`、`zl-list-item`（完成态 `is-done`；可点选的行用 `<button>`，选中加 `aria-current="true"`）、`zl-item-main`、`zl-item-title`、`zl-item-meta`、`zl-item-actions`（`--hover`：悬停才显示） |
-| 标签 / 状态 | `zl-tag`（`--accent`/`--success`/`--warning`/`--danger`）、`zl-status`（`data-state="connecting|ready|error|preview"`） |
+| 标签 / 状态 | `zl-tag`（`--accent`/`--success`/`--warning`/`--danger`）、`zl-status`（`data-state`：connecting / ready / error / preview） |
 | 提示 | `zl-alert`（`--info`/`--success`/`--warning`/`--danger`）、`zl-toast` |
 | 空 / 加载 | `zl-empty`、`zl-empty-icon`、`zl-empty-title`、`zl-empty-text`、`zl-skeleton`、`zl-spinner` |
 | 数据 | `zl-stats`、`zl-stat`、`zl-stat-label`、`zl-stat-value`、`zl-progress`（内部 `<span style="width:40%">`） |
@@ -38,144 +38,262 @@
 
 ## 版式
 
+下面的示例只示意**结构和类名**。中文都是占位，换成你应用自己的文案；凡是数据（列表、数量、时间、状态）都由代码渲染，
+不要把示例里的结构连同内容原样写死在 HTML 里。每块数据都要有加载中 / 出错 / 空 / 有数据四种状态。
+
+vanilla 示例用下面这个小工具建元素：文字一律走 `textContent`，不拼 HTML 字符串（避免把用户输入当成 HTML）。
+React 直接用 JSX，`className` 写同样的类。
+
+```js
+// 建元素：h('li', { class: 'zl-list-item', onclick: fn }, 子元素或文字…)
+export function h(tag, props = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
+    else if (key === 'class') el.className = value;
+    else if (value === true) el.setAttribute(key, '');
+    else if (value !== false && value != null) el.setAttribute(key, value);
+  }
+  el.append(...children.filter((child) => child != null && child !== false));
+  return el;
+}
+```
+
 ### 页面骨架（所有应用）
+
+HTML 里只放固定的骨架，状态和数据由脚本填：
 
 ```html
 <main class="zl-page">
   <header class="zl-header">
     <div>
-      <h1 class="zl-title">会议纪要</h1>
-      <p class="zl-subtitle">粘贴会议记录，AI 提炼要点与行动项。</p>
+      <h1 class="zl-title">应用名</h1>
+      <p class="zl-subtitle">一句话说明这个应用做什么</p>
     </div>
-    <span id="status" class="zl-status" data-state="connecting">正在连接</span>
+    <span id="status" class="zl-status" data-state="connecting">
+      正在连接
+    </span>
   </header>
-  <!-- 出错提示放在顶部，默认 hidden -->
   <div id="error" class="zl-alert zl-alert--danger" role="alert" hidden>
-    <div><strong>出了点问题</strong><span id="error-text"></span></div>
-    <button class="zl-btn zl-btn--sm" type="button">重试</button>
+    <div><strong id="error-title"></strong><span id="error-text"></span></div>
+    <button id="retry" class="zl-btn zl-btn--sm" type="button">重试</button>
   </div>
   <section class="zl-section">…</section>
 </main>
 ```
 
-### 列表（带筛选、空状态、行内操作）
+### 列表（筛选、空状态、行内操作）
+
+骨架：
 
 ```html
 <section class="zl-section">
   <div class="zl-section-title">
-    <div class="zl-segmented" role="group" aria-label="筛选">
-      <button type="button" aria-pressed="true">全部</button>
-      <button type="button" aria-pressed="false">未完成</button>
+    <div id="filters" class="zl-segmented" role="group" aria-label="筛选">
+      <button type="button" data-filter="all">全部</button>
+      <button type="button" data-filter="open">未完成</button>
     </div>
-    <span class="zl-num zl-text-sm">3 条</span>
+    <span id="count" class="zl-num zl-text-sm"></span>
   </div>
-  <ul class="zl-list">
+  <ul id="loading" class="zl-list" aria-busy="true">
     <li class="zl-list-item">
-      <div class="zl-item-main">
-        <span class="zl-item-title">应用开发入口周会</span>
-        <span class="zl-item-meta">今天 11:24 · 2 个行动项</span>
-      </div>
-      <span class="zl-tag zl-tag--accent">进行中</span>
-      <div class="zl-item-actions zl-item-actions--hover">
-        <button class="zl-btn zl-btn--ghost zl-btn--sm" type="button">删除</button>
-      </div>
+      <span class="zl-skeleton" style="width: 60%"></span>
+    </li>
+    <li class="zl-list-item">
+      <span class="zl-skeleton" style="width: 40%"></span>
     </li>
   </ul>
-  <div class="zl-empty" hidden>
-    <div class="zl-empty-icon" aria-hidden="true">✎</div>
-    <p class="zl-empty-title">还没有纪要</p>
-    <p class="zl-empty-text">把会议记录粘贴到上面，点「AI 提炼」。</p>
+  <ul id="list" class="zl-list" hidden></ul>
+  <div id="empty" class="zl-empty" hidden>
+    <div class="zl-empty-icon" aria-hidden="true">＋</div>
+    <p id="empty-title" class="zl-empty-title"></p>
+    <p id="empty-text" class="zl-empty-text"></p>
   </div>
 </section>
 ```
 
-加载中用骨架代替空白：`<ul class="zl-list"><li class="zl-list-item"><span class="zl-skeleton" style="width:60%"></span></li>…</ul>`。
+渲染（`items` 来自集合查询或 OS 接口；`remove` 是你的删除函数）：
+
+```js
+const $ = (id) => document.getElementById(id);
+
+function row(item) {
+  const actions = h('div', { class: 'zl-item-actions zl-item-actions--hover' });
+  // 沙箱里不能用 confirm()：删除用行内二次确认
+  const ask = () => actions.replaceChildren(
+    h('button', {
+      class: 'zl-btn zl-btn--danger zl-btn--sm', type: 'button',
+      onclick: () => remove(item),
+    }, '确认删除'),
+    h('button', {
+      class: 'zl-btn zl-btn--ghost zl-btn--sm', type: 'button',
+      onclick: () => render(),
+    }, '取消'),
+  );
+  actions.append(h('button', {
+    class: 'zl-btn zl-btn--ghost zl-btn--sm', type: 'button', onclick: ask,
+  }, '删除'));
+  return h('li', { class: 'zl-list-item' + (item.done ? ' is-done' : '') },
+    h('div', { class: 'zl-item-main' },
+      h('span', { class: 'zl-item-title' }, item.title),
+      h('span', { class: 'zl-item-meta' }, formatTime(item.updated_at)),
+    ),
+    item.tag && h('span', { class: 'zl-tag zl-tag--accent' }, item.tag),
+    actions,
+  );
+}
+
+function render() {
+  const visible = items.filter((it) => filter === 'all' || !it.done);
+  $('loading').hidden = true;
+  $('count').textContent = items.length ? `${visible.length} 条` : '';
+  $('list').replaceChildren(...visible.map(row));
+  $('list').hidden = visible.length === 0;
+  $('empty').hidden = visible.length > 0;
+  // 空状态分两种：真的没有数据 / 筛选后没有
+  $('empty-title').textContent = items.length ? '没有符合条件的' : '还没有内容';
+  $('empty-text').textContent = items.length
+    ? '换个筛选看看。'
+    : '告诉用户下一步做什么，比如「在上面新建第一条」。';
+  for (const btn of $('filters').querySelectorAll('button')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.filter === filter));
+  }
+}
+```
+
+React 写法相同，按状态返回不同的块：
+
+```tsx
+if (loading) return <ListSkeleton />;
+if (error) return <Alert tone="danger" onRetry={reload}>{error}</Alert>;
+if (items.length === 0) return <Empty title="还没有内容" text="下一步做什么" />;
+return (
+  <ul className="zl-list">
+    {items.map((item) => (
+      <li key={item._id} className="zl-list-item">
+        <div className="zl-item-main">
+          <span className="zl-item-title">{item.title}</span>
+          <span className="zl-item-meta">{formatTime(item.updated_at)}</span>
+        </div>
+      </li>
+    ))}
+  </ul>
+);
+```
 
 ### 表单 / 输入区（卡片包裹）
 
 ```html
-<form class="zl-card zl-stack">
+<form id="form" class="zl-card zl-stack">
   <div class="zl-field">
-    <label class="zl-label" for="title">标题</label>
-    <input id="title" class="zl-input" placeholder="可留空，由 AI 生成" />
+    <label class="zl-label" for="name">字段名</label>
+    <input id="name" class="zl-input" required />
   </div>
   <div class="zl-field">
-    <label class="zl-label" for="content">会议记录</label>
-    <textarea id="content" class="zl-textarea" rows="6"></textarea>
-    <span class="zl-hint">支持直接粘贴聊天记录。</span>
+    <label class="zl-label" for="body">长文本字段</label>
+    <textarea id="body" class="zl-textarea" rows="6"></textarea>
+    <span class="zl-hint">告诉用户怎么填</span>
   </div>
   <div class="zl-row zl-row--end">
-    <button class="zl-btn zl-btn--primary" type="submit">AI 提炼要点</button>
+    <button id="submit" class="zl-btn zl-btn--primary" type="submit">
+      提交
+    </button>
   </div>
 </form>
 ```
 
-### 左列表右详情（历史记录 + 当前项）
+提交时按钮加 `aria-busy="true"` 并禁用，结束后恢复；校验失败给对应输入框加 `aria-invalid="true"`，
+在 `zl-hint` 里写原因。
+
+### 左列表右详情（记录列表 + 当前项）
 
 ```html
 <main class="zl-page zl-page--wide">
   <header class="zl-header">…</header>
   <div class="zl-split">
-    <aside class="zl-stack--sm zl-stack">
-      <button class="zl-btn zl-btn--primary zl-btn--block" type="button">新建纪要</button>
-      <div class="zl-list">
-        <button class="zl-list-item" type="button" aria-current="true">
-          <span class="zl-item-main">
-            <span class="zl-item-title zl-ellipsis">产品周会</span>
-            <span class="zl-item-meta">11-06 10:30 · 3 个行动项</span>
-          </span>
-        </button>
-        <button class="zl-list-item" type="button">…</button>
-      </div>
+    <aside class="zl-stack zl-stack--sm">
+      <button id="new" class="zl-btn zl-btn--primary zl-btn--block"
+        type="button">新建</button>
+      <div id="records" class="zl-list"></div>
     </aside>
-    <section class="zl-card zl-stack">…选中项的详情或新建表单…</section>
+    <section id="detail" class="zl-card zl-stack"></section>
   </div>
 </main>
 ```
 
-- 窗口窄于 720px 时自动变成上下排；左栏在宽窗口里吸顶、单独滚动；
-- 列表为空时左栏放 `zl-empty`，右栏直接显示新建表单，不要两边都空。
-
-### 行内可编辑字段（负责人、截止日期）
-
-```html
-<li class="zl-list-item">
-  <div class="zl-item-main">
-    <span class="zl-item-title">整理接口清单</span>
-    <div class="zl-row zl-text-sm">
-      <span class="zl-tag zl-tag--accent">张三</span>
-      <input class="zl-input zl-input--inline" type="date" value="2026-11-07" aria-label="截止日期" />
-    </div>
-  </div>
-  <button class="zl-btn zl-btn--sm" type="button">加入待办</button>
-</li>
+```js
+function recordButton(record) {
+  return h('button', {
+    class: 'zl-list-item', type: 'button',
+    'aria-current': record._id === selectedId ? 'true' : false,
+    onclick: () => select(record._id),
+  },
+    h('span', { class: 'zl-item-main' },
+      h('span', { class: 'zl-item-title zl-ellipsis' }, record.title),
+      h('span', { class: 'zl-item-meta' }, formatTime(record.updated_at)),
+    ),
+  );
+}
 ```
 
-- `zl-input--inline` 平时像文字，悬停 / 聚焦才显出边框；`change` 时保存，失败把值改回并提示；
-- 原生日期框 `type="date"`、`type="time"` 在沙箱里可用，弹出的日历也跟随亮 / 暗；原生下拉 `<select>` 也可用，但选项少（≤ 5）时 `zl-segmented` 更好点。
+- 窗口窄于 720px 时自动上下排；宽窗口里左栏吸顶、单独滚动；
+- 没有记录时左栏放 `zl-empty`，右栏直接显示新建表单，不要两边都空；
+- 切换选中项时右栏先显示骨架，再填详情。
+
+### 行内可编辑字段（日期、负责人这类）
+
+```js
+function dateField(item) {
+  const input = h('input', {
+    class: 'zl-input zl-input--inline', type: 'date',
+    value: item.due ?? '', 'aria-label': '日期',
+  });
+  input.addEventListener('change', async () => {
+    const before = item.due ?? '';
+    try {
+      await save(item, { due: input.value || null });
+    } catch (error) {
+      input.value = before; // 保存失败：值改回去并提示
+      toast('没有保存：' + describe(error));
+    }
+  });
+  return input;
+}
+```
+
+- `zl-input--inline` 平时像文字，悬停 / 聚焦才显出边框，适合放在列表行里；
+- 原生 `type="date"`、`type="time"` 在沙箱里可用，弹出的日历也跟随亮 / 暗；原生 `<select>` 也可用，
+  选项少（≤ 5）时 `zl-segmented` 更好点。
 
 ### 统计 + 占比
 
-```html
-<div class="zl-stats">
-  <div class="zl-stat"><div class="zl-stat-label">本月收入</div><div class="zl-stat-value zl-text-success">8,000.00</div></div>
-  <div class="zl-stat"><div class="zl-stat-label">本月支出</div><div class="zl-stat-value">44.50</div></div>
-</div>
-<div class="zl-stack--sm zl-stack">
-  <div class="zl-row zl-row--between zl-text-sm"><span>餐饮</span><span class="zl-num zl-muted">73%</span></div>
-  <div class="zl-progress"><span style="width: 73%"></span></div>
-</div>
+数值由数据计算，骨架里留空：
+
+```js
+$('stats').replaceChildren(
+  ...summary.map(({ label, value, tone }) =>
+    h('div', { class: 'zl-stat' },
+      h('div', { class: 'zl-stat-label' }, label),
+      h('div', { class: 'zl-stat-value' + (tone ? ` zl-text-${tone}` : '') },
+        value),
+    ),
+  ),
+);
+const bar = (percent) =>
+  h('div', { class: 'zl-progress' },
+    h('span', { style: `width: ${Math.round(percent)}%` }));
 ```
 
 ### AI 结果（耗时操作）
 
-- 点击后按钮 `aria-busy="true"`，旁边一句 `<span class="zl-muted zl-text-sm">AI 正在整理，约 10–30 秒…</span>`；
-- 结果放进 `zl-card`，正文用 `zl-prose`，要点用 `<ul>`，新出现的块加 `zl-enter`；
+- 点击后按钮 `aria-busy="true"`，旁边一句 `<span class="zl-muted zl-text-sm">` 说明预计要多久；
+- 结果放进 `zl-card`，正文用 `zl-prose`，要点用列表，新出现的块加 `zl-enter`；
 - 失败用 `zl-alert--danger` 显示原因和「重试」。
 
 ### 卡片网格（多个对象并列）
 
-`<div class="zl-grid"><article class="zl-card zl-card--interactive">…</article>…</div>`，每张卡片：标题 `zl-card-title`、一行 `zl-item-meta`、底部 `zl-row` 放标签或操作。
+`<div class="zl-grid">` 里放若干 `<article class="zl-card zl-card--interactive">`，每张卡片：标题 `zl-card-title`、
+一行 `zl-item-meta`、底部 `zl-row` 放标签或操作；同样由数据渲染。
 
 ## 交付前自查
 
