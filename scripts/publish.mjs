@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// 备用的逐个直接发布（每个包各自 2FA）。日常请用 npm run release（scripts/release.mjs：自动检测 + 一次授权）。
 // 按依赖顺序发布：平台子包 → CLI 主包 → SDK → create-zleap-app。
 // registry 上已有的版本直接跳过，也不要求本地有它的产物：只改了 SDK 时不用编译 CLI，只改了模板时两者都不用构建。
 //
@@ -134,7 +135,7 @@ const failureHelp =
   '  · 网页验证没完成：npm 打印「Authenticate your account at <链接>」后，按回车打开浏览器（或手动打开链接）完成验证再回到终端；\n' +
   '  · 出现「Exit handler never called!」是 npm 10 自身的问题，重跑即可；仍然出现就换新版 npm：npx -y npm@11 run release -- --source ../zleap-service；\n' +
   '  · 账号没开两步验证：npmjs.com → 头像 → Account → Two-Factor Authentication → Enable 2FA（模式选 Authorization and writes）。\n' +
-  '已发布的包重跑时会自动跳过：npm run release -- --source ../zleap-service';
+  '已发布的包重跑时会自动跳过：npm run publish:direct -- --source ../zleap-service';
 
 let done = 0;
 const staged = [];
@@ -189,10 +190,10 @@ if (!dryRun) {
   if (waiting.length) {
     console.log(
       `\n以下版本暂时还查不到：\n  ${waiting.join('\n  ')}\n` +
-        '刚发布的版本 registry 要处理几分钟，过 5 分钟再运行 npm run release 核对（已上线的会跳过）；\n' +
+        '刚发布的版本 registry 要处理几分钟，过 5 分钟再运行 npm run publish:direct 核对（已上线的会跳过）；\n' +
         '仍查不到、且 npm 上显示 0.0.0-stage 占位版本的，是在「待批准」暂存区：\n' +
         '批准方式（需要 2FA；stage 命令要 npm 12）：npx -y npm@latest stage list 查看暂存编号 → 逐个 npx -y npm@latest stage approve <stage-id>；\n' +
-        '或在 npmjs.com 头像 → Packages →「Staged Packages」里点 Approve。批准后再运行 npm run release 核对。',
+        '或在 npmjs.com 头像 → Packages →「Staged Packages」里点 Approve。批准后再运行 npm run publish:direct 核对。',
     );
     process.exitCode = 1;
   }

@@ -76,40 +76,35 @@ test/                           node:test：脚手架、二进制解析、部署
 
 ### 发布
 
-三个包线各自独立发版（`kit.config.json`），**只给真正变了的那条递增版本**：
-
-| 改了什么 | 递增 | 要构建 | 实际发布 |
-| --- | --- | --- | --- |
-| 只改模板 / skills / 脚手架 | `createVersion` | 无 | `create-zleap-app`（1 个） |
-| SDK（`zleap-service/.../templates/todo/sdk`） | `sdkVersion` + `createVersion` | `build:sdk` | SDK + 脚手架（2 个） |
-| CLI Go 源码（`zleap-service/cmd/zleap-app`、`internal/appdevcli`） | `cliVersion` + `createVersion` | `build:cli` | 4 个平台子包 + CLI 主包 + 脚手架 |
-
-`createVersion` 跟着递增，是因为脚手架把生成时刻的 CLI / SDK 版本写进新项目的依赖。`npm run release` 会跳过 registry 上已有的版本，
-也不要求本地有被跳过的包的产物（只发脚手架时不用编译 CLI、不用构建 SDK）。
-CLI 二进制内嵌了一份 SDK（MCP 的 SDK 参考、原生模板），只发 SDK 不发 CLI 时发布脚本会提示这份旧了一版，不影响应用运行，下次 CLI 发版时自然跟上。
-
-平台子包只有 4 个：`darwin` 是 arm64 + x64 的通用二进制（`lipo` 合成，所以 `build:cli` 要在 Mac 上跑）；
-`win32-x64` 的 `cpu` 同时声明 `x64`、`arm64`，Windows 11 on ARM 用系统自带的 x64 仿真运行它。
-增删平台时同时改 `kit.config.json` 的 `platforms` 与 `packages/app-cli/lib/resolve.js` 的 `PACKAGES`，`npm run check` 会核对两边。
-
-在 monorepo 根目录、已安装 Go 1.26 的 Mac 上：
+一条命令：
 
 ```bash
 cd zleap-app-kit
-# 1. 按上表改 kit.config.json 的版本，然后
-npm run sync
-npm install                # esbuild（构建 SDK 用）
-npm run build:sdk -- --source ../zleap-service      # 只在发 SDK 时需要
-npm run build:cli -- --source ../zleap-service      # 只在发 CLI 时需要
-npm run sync:refs -- --docs ../zleap-web/apps/docs
-npm test
-# 2. 发布：先 dry-run，再正式（需对 @zleap-ai 有发布权限：npm login，或 NPM_CONFIG_USERCONFIG 指向含 token 的临时 .npmrc）
-npm run release:dry
-npm run release            # 或 node scripts/publish.mjs --tag next
-# 3. 推送本仓库到公开 GitHub（skills 通过 GitHub 仓库地址安装）
+npm run release:dry        # 只看计划：哪些包和 npm 上不一样、各发什么版本（不改文件）
+npm run release            # 正式发布：确认计划 → 自动定版本、构建、测试 → 上传暂存区 → 一次 2FA 批准全部
 ```
 
-发布顺序固定为：平台子包 → `@zleap-ai/app-cli` → `@zleap-ai/app-sdk` → `create-zleap-app`。npm 上同一版本号只能发布一次，修问题要递增版本。
+`scripts/release.mjs` 做的事：
+
+1. **检测**：每条版本线和 npm 上的 latest 比内容，只发真正变了的。
+   - CLI：比 zleap-app 的源码指纹（`go list` 出的依赖源码、embed 文件、第三方模块版本、Go 版本、编译参数；写在平台包 `zleapApp.source`）、平台包组合、主包文件。
+   - SDK：比 SDK 源码指纹（npm 包里的 `dist/build-info.json`）和包壳文件。
+   - 脚手架：`npm pack` 后逐文件比（模板、skills 等）；CLI / SDK 要发版时它也跟着发，好把新版本号写进新项目。
+   - 文档站有新改动还没同步进 skills 时会问要不要一起发布。
+2. **定版本**：本地 `kit.config.json` 已写了更新且没发过的版本就用它，否则在 npm 版本上递增补丁号；不发布的线对齐到 npm 上的版本（脚手架只会引用已发布的版本）。
+3. **构建与测试**：按需 `build:sdk` / `build:cli`（`darwin` 通用二进制要用 `lipo`，所以在 Mac 上跑），再 `sync --check` 和 `npm test`。
+4. **发布**：先用 npm 12 的 `npm stage publish` 把所有包上传进暂存区（不需要 2FA），再按「平台子包 → CLI 主包 → SDK → 脚手架」依次批准。
+   批准时只验证一次：2FA 是验证器 App 就输一次 6 位码；是安全密钥 / 浏览器验证就在浏览器里确认一次，凭据给后面的包复用，npm 不收时才再开一次浏览器。
+
+npm 登录失效时脚本会打开浏览器让你重新 `npm login`。中途失败直接重跑：已上线的跳过，已在暂存区且内容相同的沿用。
+其他参数：`--yes`（不问确认）、`--force cli,sdk,create`（没变也强制发）、`--refs`（配合 `--yes` 同步文档站改动）、`--source` / `--docs`（事实源位置）。
+
+平台子包只有 4 个：`darwin` 是 arm64 + x64 的通用二进制；`win32-x64` 的 `cpu` 同时声明 `x64`、`arm64`，Windows 11 on ARM 用系统自带的 x64 仿真运行它。
+增删平台时同时改 `kit.config.json` 的 `platforms` 与 `packages/app-cli/lib/resolve.js` 的 `PACKAGES`，`npm run check` 会核对两边。
+CLI 二进制内嵌了一份 SDK（MCP 的 SDK 参考、原生模板），它不计入 CLI 指纹：只改 SDK 时不发 CLI，那份参考下次 CLI 发版时跟上。
+
+发布后提交 `kit.config.json` 等改动并推送到公开 GitHub（skills 通过 GitHub 仓库地址安装）。
+`npm run publish:direct`（`scripts/publish.mjs`）是旧的逐个直接发布，每个包各自 2FA，只在暂存发布不可用时备用。
 
 ## 平台约束（模板与 skills 都已内置）
 

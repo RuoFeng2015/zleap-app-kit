@@ -13,6 +13,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { join, resolve } from 'node:path';
 
 import { arg, config, paths, platformDir, platformPackageName, platformSuffix, sdkSourceDigest, sdkSourceDir } from './lib/config.mjs';
+import { cliSourceDigest, GO_BUILD_ARGS } from './lib/fingerprint.mjs';
 
 const source = resolve(arg('source', join(paths.root, '..', 'zleap-service')));
 const go = arg('go', 'go');
@@ -48,6 +49,8 @@ try {
 }
 // CLI 二进制内嵌了一份 SDK（MCP 的 SDK 参考、原生模板）：记下指纹，发布 SDK 时提示两者是否同一份。
 const sdk = sdkSourceDigest(sdkSourceDir(source)).digest;
+// CLI 源码指纹写进平台包的 package.json（zleapApp.source），release 拿它和 npm 上的版本比，判断 CLI 要不要发版。
+const cliSource = cliSourceDigest(source, go);
 
 const checksumsFile = join(paths.npm, 'checksums.json');
 const previous = existsSync(checksumsFile) ? JSON.parse(readFileSync(checksumsFile, 'utf8')) : {};
@@ -66,7 +69,7 @@ for (const platform of selected) {
   process.stdout.write(`构建 ${platformSuffix(platform)}（${platform.goos}/${platform.goarch.join('+')}）… `);
   const slices = platform.goarch.map((goarch) => (platform.goarch.length > 1 ? `${output}-${goarch}` : output));
   platform.goarch.forEach((goarch, i) => {
-    execFileSync(go, ['build', '-trimpath', '-ldflags=-s -w', '-o', slices[i], './cmd/zleap-app'], {
+    execFileSync(go, [...GO_BUILD_ARGS, '-o', slices[i], './cmd/zleap-app'], {
       cwd: source,
       stdio: ['ignore', 'inherit', 'inherit'],
       env: { ...process.env, CGO_ENABLED: '0', GOOS: platform.goos, GOARCH: goarch, GOFLAGS: '-buildvcs=false' },
@@ -79,7 +82,7 @@ for (const platform of selected) {
   if (platform.goos !== 'windows') chmodSync(output, 0o755);
 
   const digest = createHash('sha256').update(readFileSync(output)).digest('hex');
-  checksums[platformSuffix(platform)] = { file: `bin/${exe}`, sha256: digest, commit, sdk };
+  checksums[platformSuffix(platform)] = { file: `bin/${exe}`, sha256: digest, commit, source: cliSource, sdk };
 
   const name = platformPackageName(platform);
   const arch = platform.cpu.join(' / ');
@@ -96,7 +99,7 @@ for (const platform of selected) {
         cpu: platform.cpu,
         files: ['bin'],
         preferUnplugged: true,
-        zleapApp: { commit, sha256: digest },
+        zleapApp: { commit, sha256: digest, source: cliSource },
       },
       null,
       2,

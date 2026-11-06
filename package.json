@@ -15,8 +15,10 @@
     "build:cli": "node scripts/build-cli.mjs",
     "check": "node scripts/sync.mjs --check",
     "test": "node --test test/*.test.mjs",
-    "release:dry": "node scripts/publish.mjs --dry-run",
-    "release": "node scripts/publish.mjs"
+    "release:dry": "node scripts/release.mjs --dry-run",
+    "release": "node scripts/release.mjs",
+    "release:approve": "node scripts/release.mjs --approve-only",
+    "publish:direct": "node scripts/publish.mjs"
   },
   "devDependencies": {
     "esbuild": "0.25.12"
