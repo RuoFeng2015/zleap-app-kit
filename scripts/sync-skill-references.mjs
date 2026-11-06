@@ -39,6 +39,11 @@ const MAP = {
   },
 };
 
+/** 手写的参考文件（文档站没有对应页面）：同步时保留，不当作「多余」删掉。 */
+const HANDWRITTEN = {
+  'zleap-cloud-app': ['ui.md'],
+};
+
 const LABEL = { tip: '提示', info: '说明', warning: '注意', danger: '危险', details: '详情' };
 
 /** 站内链接 → 同一 skill 内的参考文件；不在本 skill 里的页面改成「文档站 <路径>」纯文本。 */
@@ -101,15 +106,17 @@ const drift = [];
 for (const [skill, files] of Object.entries(MAP)) {
   const dir = join(paths.skills, skill, 'references');
   const expected = Object.fromEntries(Object.entries(files).map(([ref, page]) => [ref, convert(page, files)]));
+  const handwritten = HANDWRITTEN[skill] ?? [];
   for (const [ref, content] of Object.entries(expected)) {
     const file = join(dir, ref);
     if (!existsSync(file) || readFileSync(file, 'utf8').replace(/\r\n/g, '\n') !== content) drift.push(`${skill}/${ref}`);
   }
-  const extra = existsSync(dir) ? readdirSync(dir).filter((name) => !(name in expected)) : [];
+  const extra = existsSync(dir) ? readdirSync(dir).filter((name) => !(name in expected) && !handwritten.includes(name)) : [];
   drift.push(...extra.map((name) => `${skill}/${name}（多余）`));
+  drift.push(...handwritten.filter((name) => !existsSync(join(dir, name))).map((name) => `${skill}/${name}（手写文件缺失，从 git 恢复）`));
   if (!check) {
-    rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
+    for (const name of extra) rmSync(join(dir, name), { recursive: true, force: true });
     for (const [ref, content] of Object.entries(expected)) writeFileSync(join(dir, ref), content);
   }
 }

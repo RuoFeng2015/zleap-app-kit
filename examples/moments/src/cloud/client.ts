@@ -57,9 +57,10 @@ export function errorCode(error: unknown): string {
 }
 
 /**
- * 面向用户的中文说明。未知错误码原样展示，方便对照文档「状态与错误码」。
+ * 面向用户的中文说明，只返回文案、不拼英文错误码；错误码另用 errorCode() 取（埋点、按码分支）。
  *
  * 宿主只把错误码（errCode）交给应用，不传服务端的中文说明，所以文案在这里按码维护。
+ * 没列出的码给通用提示；对照文档「状态与错误码」排查时看 errorCode() 或 npm run logs。
  */
 export function describeError(error: unknown): string {
   const code = errorCode(error);
@@ -84,5 +85,5 @@ export function describeError(error: unknown): string {
     AUTH_GESTURE_REQUIRED: '请点按钮后再授权。',
     DOCUMENT_NOT_FOUND: '这条内容已经被删除了。',
   };
-  return hints[code] ? `${hints[code]}（${code}）` : code;
+  return hints[code] ?? '操作没有完成，请稍后重试。';
 }

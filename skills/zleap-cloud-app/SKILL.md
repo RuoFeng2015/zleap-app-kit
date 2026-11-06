@@ -18,7 +18,7 @@ zleapOS 云开发应用 = 一个网页（运行在 zleapOS 桌面的沙箱 ifram
 | 都没有 | 新建项目，见第 1 节 | — |
 
 几种形态的 SDK 是同一套 API，只是来源不同：React 模板从 npm 包 `@zleap-ai/app-sdk` 导入（`/host` 宿主能力、`/workspace` 工作区），
-以 `node_modules/@zleap-ai/app-sdk/dist/types/*.d.ts` 为准，并与 `@zleap-ai/app-cli` 保持同版本；vanilla 模板用 `app/sdk/*.js`（`npm install` / `npm run deploy` 从同一个 npm 包复制，不要手改）；原生模板用项目里的 `./sdk/*.js`。
+以 `node_modules/@zleap-ai/app-sdk/dist/types/*.d.ts` 为准（SDK 与 `@zleap-ai/app-cli` 各自独立发版，版本号不必相同）；vanilla 模板用 `app/sdk/*.js`（`npm install` / `npm run deploy` 从同一个 npm 包复制，不要手改）；原生模板用项目里的 `./sdk/*.js`。
 参考资料里写 `./sdk/index.js` / `./sdk/zleap-sdk.js` 的地方，在 React 模板里分别对应 `@zleap-ai/app-sdk` / `@zleap-ai/app-sdk/host`。
 
 ## 开发路线：先查现成能力，再补云函数（所有模板都一样）
@@ -86,7 +86,7 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 2. **权限**：需要的能力加进 `requires`（`cloud.database.read/write`、`cloud.storage.read/write`、`os.agent.complete` 等，白名单外的非可选能力会让应用「暂不可用」）。`reason` 会展示给用户，写具体用途。
 3. **数据层**：React 模板在 `src/cloud/` 下按集合写一个模块（参照 `src/cloud/todos.ts`），组件只调用这些函数；错误用 `describeError()` 展示。OS 接口用 `osFetch()`（vanilla 用 `zl.cloud.os.api.fetch`），预览模式会自动换成示例数据。
 4. **界面与本地验证**：按上面「界面」一节写界面，`npm run preview` 看效果；再 `npm run typecheck && npm run check`（`check` 通过只代表静态契约，`runtime_test=not_checked`）。
-5. **部署到自己桌面**：`npm run deploy`（构建 → 检查 → 上传开发版本（appid 应用仅成员可见）→ 安装/切换本人安装 → 按平台诊断准备资源；内容变化时自动递增补丁号）。上传之后的步骤由 `zleap-app deploy` 完成，可重复执行，部署记录在 `.zleap/state.json`；不要再手动 publish / install / update 另起一套记录。
+5. **部署到自己桌面**：`npm run deploy`（构建 → 检查 → 上传开发版本（appid 应用仅本人和开发人员可见）→ 安装/切换本人安装 → 按平台诊断准备资源；内容变化时自动递增补丁号）。上传之后的步骤由 `zleap-app deploy` 完成，可重复执行，部署记录在 `.zleap/state.json`；不要再手动 publish / install / update 另起一套记录。
    - 报未登录/会话过期 → 请用户运行 `npm run login -- --target <OS 地址>` 并在浏览器核对确认码。
    - 报 `DATA_MIGRATION_REQUIRED` → 新版本改了 data/storage 声明，见第 5 节。
 6. **请用户验收**：安装时平台会自动创建开发环境、开通数据库并按声明建集合，`npm run deploy` 结束时会打印状态；显示未就绪时，请用户在「云开发控制台」选中应用 →「概览」按提示处理。然后从启动台打开应用（已打开的点「重新加载应用」）。

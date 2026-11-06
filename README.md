@@ -22,7 +22,7 @@ npm create zleap-app@latest my-app -- --appid zl3f9a2c7e1b0d4a68
 # 2. 登录并部署到自己的 zleapOS 桌面
 cd my-app
 npm run login            # 浏览器核对确认码后允许（访问凭据自动续期，授权最长 30 天）
-npm run deploy           # 构建 → 平台检查 → 上传开发版本（appid 应用仅成员可见）→ 安装/切换本人安装
+npm run deploy           # 构建 → 平台检查 → 上传开发版本（appid 应用仅本人和开发人员可见）→ 安装/切换本人安装
 ```
 
 安装时平台会自动创建开发环境并开通数据库（`npm run deploy` 结束时会打印状态），然后从启动台打开应用。
@@ -52,11 +52,11 @@ Claude Code 也可以作为插件市场添加：`/plugin marketplace add RuoFeng
 ## 维护者：仓库结构
 
 ```
-kit.config.json                 发布坐标（包名、scope、版本、skills 仓库、平台列表）——改名只改这里
-packages/app-cli/               @zleap-ai/app-cli：bin/zleap-app.js 入口 + lib/resolve.js 平台解析
+kit.config.json                 发布坐标（包名、scope、三条版本线、skills 仓库、平台列表）——改名只改这里
+packages/app-cli/               @zleap-ai/app-cli：bin/zleap-app.js 入口 + lib/resolve.js 平台解析（PACKAGES 表与 kit.config.json 的 platforms 对应）
 packages/app-sdk/               @zleap-ai/app-sdk 包壳（package.json / LICENSE / README）；dist/ 由 build:sdk 在本地生成，不入库
 packages/create-zleap-app/      脚手架：index.js、lib/scaffold.js、templates/react-ts、skills/（由 sync 复制）
-npm/app-cli-<os>-<cpu>/         平台子包（build-cli 生成，二进制不入库）
+npm/app-cli-<key>/              平台子包 darwin / linux-x64 / linux-arm64 / win32-x64（build-cli 生成，二进制不入库）
 skills/                         skills 源（SKILL.md 手写；references/ 由文档站同步生成）
 scripts/                        build-cli / build-sdk / sync / sync-skill-references / publish
 test/                           node:test：脚手架、二进制解析、部署流程（用 CLI 替身）、SDK 产物（有 dist 时）
@@ -76,27 +76,40 @@ test/                           node:test：脚手架、二进制解析、部署
 
 ### 发布
 
-版本号与 `zleap-app` CLI 对齐（当前 0.10.0）。在 monorepo 根目录、已安装 Go 1.26 的机器上：
+三个包线各自独立发版（`kit.config.json`），**只给真正变了的那条递增版本**：
+
+| 改了什么 | 递增 | 要构建 | 实际发布 |
+| --- | --- | --- | --- |
+| 只改模板 / skills / 脚手架 | `createVersion` | 无 | `create-zleap-app`（1 个） |
+| SDK（`zleap-service/.../templates/todo/sdk`） | `sdkVersion` + `createVersion` | `build:sdk` | SDK + 脚手架（2 个） |
+| CLI Go 源码（`zleap-service/cmd/zleap-app`、`internal/appdevcli`） | `cliVersion` + `createVersion` | `build:cli` | 4 个平台子包 + CLI 主包 + 脚手架 |
+
+`createVersion` 跟着递增，是因为脚手架把生成时刻的 CLI / SDK 版本写进新项目的依赖。`npm run release` 会跳过 registry 上已有的版本，
+也不要求本地有被跳过的包的产物（只发脚手架时不用编译 CLI、不用构建 SDK）。
+CLI 二进制内嵌了一份 SDK（MCP 的 SDK 参考、原生模板），只发 SDK 不发 CLI 时发布脚本会提示这份旧了一版，不影响应用运行，下次 CLI 发版时自然跟上。
+
+平台子包只有 4 个：`darwin` 是 arm64 + x64 的通用二进制（`lipo` 合成，所以 `build:cli` 要在 Mac 上跑）；
+`win32-x64` 的 `cpu` 同时声明 `x64`、`arm64`，Windows 11 on ARM 用系统自带的 x64 仿真运行它。
+增删平台时同时改 `kit.config.json` 的 `platforms` 与 `packages/app-cli/lib/resolve.js` 的 `PACKAGES`，`npm run check` 会核对两边。
+
+在 monorepo 根目录、已安装 Go 1.26 的 Mac 上：
 
 ```bash
 cd zleap-app-kit
-# 1. 改 kit.config.json 的 version，然后
+# 1. 按上表改 kit.config.json 的版本，然后
 npm run sync
 npm install                # esbuild（构建 SDK 用）
-npm run build:sdk -- --source ../zleap-service
+npm run build:sdk -- --source ../zleap-service      # 只在发 SDK 时需要
+npm run build:cli -- --source ../zleap-service      # 只在发 CLI 时需要
 npm run sync:refs -- --docs ../zleap-web/apps/docs
 npm test
-# 2. 交叉编译 6 个平台（darwin/linux/win32 × x64/arm64）
-npm run build:cli -- --source ../zleap-service
-# 3. 发布：先 dry-run，再正式（需对 @zleap-ai 有发布权限：npm login，或 NPM_CONFIG_USERCONFIG 指向含 token 的临时 .npmrc）
+# 2. 发布：先 dry-run，再正式（需对 @zleap-ai 有发布权限：npm login，或 NPM_CONFIG_USERCONFIG 指向含 token 的临时 .npmrc）
 npm run release:dry
 npm run release            # 或 node scripts/publish.mjs --tag next
-# 4. 推送本仓库到公开 GitHub（skills 通过 GitHub 仓库地址安装）
+# 3. 推送本仓库到公开 GitHub（skills 通过 GitHub 仓库地址安装）
 ```
 
 发布顺序固定为：平台子包 → `@zleap-ai/app-cli` → `@zleap-ai/app-sdk` → `create-zleap-app`。npm 上同一版本号只能发布一次，修问题要递增版本。
-
-`create-zleap-app` 不带 scope，版本单独由 `kit.config.json` 的 `createVersion` 控制（缺省跟随 `version`）：只有脚手架内容变化、CLI/SDK 与二进制不重编时，只递增 `createVersion` 即可（`zleapKit.cliVersion/sdkVersion` 仍跟随 `version`）。
 
 ## 平台约束（模板与 skills 都已内置）
 

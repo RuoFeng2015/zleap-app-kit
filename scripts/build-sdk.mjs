@@ -8,13 +8,13 @@
 // 混淆范围：去注释、压缩、改写局部与模块内标识符。属性名不改——它们是与宿主之间的消息协议和数据字段。
 // 产物禁止 eval / new Function / 动态 import（应用沙箱 CSP 不允许），构建后自动检查。
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { arg, config, flag, paths } from './lib/config.mjs';
+import { arg, config, flag, paths, sdkSourceDigest, sdkSourceDir } from './lib/config.mjs';
 
 const source = resolve(arg('source', join(paths.root, '..', 'zleap-service')));
-const from = join(source, 'internal', 'appdevcli', 'templates', 'todo', 'sdk');
+const from = sdkSourceDir(source);
 const dist = join(paths.sdk, 'dist');
 const check = flag('check');
 
@@ -28,21 +28,16 @@ if (!existsSync(from)) {
   process.exit(1);
 }
 
-const sourceFiles = readdirSync(from)
-  .filter((name) => name.endsWith('.js') || name.endsWith('.d.ts') || name === STYLE)
-  .sort();
-const sourceDigest = createHash('sha256');
-for (const name of sourceFiles) sourceDigest.update(name).update('\0').update(readFileSync(join(from, name)));
-const digest = sourceDigest.digest('hex');
+const { files: sourceFiles, digest } = sdkSourceDigest(from, STYLE);
 
 const infoFile = join(dist, 'build-info.json');
 if (check) {
   const info = existsSync(infoFile) ? JSON.parse(readFileSync(infoFile, 'utf8')) : null;
-  if (!info || info.source !== digest || info.version !== config.version) {
+  if (!info || info.source !== digest || info.version !== config.sdkVersion) {
     console.error('packages/app-sdk/dist 不是由当前 SDK 源码 / 版本构建的，运行 npm run build:sdk。');
     process.exit(1);
   }
-  console.log(`SDK 产物与源码一致（${sourceFiles.length} 个源文件，版本 ${config.version}）`);
+  console.log(`SDK 产物与源码一致（${sourceFiles.length} 个源文件，版本 ${config.sdkVersion}）`);
   process.exit(0);
 }
 
@@ -57,7 +52,7 @@ try {
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(join(dist, 'types'), { recursive: true });
 
-const banner = `/*! ${config.sdkPackage} v${config.version} | (c) ${new Date().getFullYear()} Zleap | 专有许可，仅限在 zleapOS 应用中使用，见 LICENSE */`;
+const banner = `/*! ${config.sdkPackage} v${config.sdkVersion} | (c) ${new Date().getFullYear()} Zleap | 专有许可，仅限在 zleapOS 应用中使用，见 LICENSE */`;
 const result = await esbuild.build({
   entryPoints: Object.fromEntries(Object.entries(ENTRIES).map(([out, file]) => [out, join(from, file)])),
   outdir: dist,
@@ -111,12 +106,12 @@ for (const out of Object.keys(ENTRIES)) {
 
 writeFileSync(
   infoFile,
-  `${JSON.stringify({ package: config.sdkPackage, version: config.version, source: digest, files: sourceFiles.length, outputs }, null, 2)}\n`,
+  `${JSON.stringify({ package: config.sdkPackage, version: config.sdkVersion, source: digest, files: sourceFiles.length, outputs }, null, 2)}\n`,
 );
 const inputBytes = Object.values(result.metafile.inputs).reduce((sum, input) => sum + input.bytes, 0);
 const outputBytes = Object.values(outputs).reduce((sum, output) => sum + output.bytes, 0);
 console.log(
-  `已构建 ${config.sdkPackage}@${config.version}：${Object.keys(ENTRIES)
+  `已构建 ${config.sdkPackage}@${config.sdkVersion}：${Object.keys(ENTRIES)
     .map((out) => `${out}.js ${(outputs[out].bytes / 1024).toFixed(1)}KB`)
     .join('，')}（源码 ${(inputBytes / 1024).toFixed(1)}KB → ${(outputBytes / 1024).toFixed(1)}KB）`,
 );

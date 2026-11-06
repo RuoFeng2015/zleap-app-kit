@@ -20,7 +20,7 @@ let rows = [];
 let filter = 'all';
 let busy = false;
 
-/** 面向用户的中文说明；宿主只给错误码，未知错误码原样展示。 */
+/** 面向用户的中文说明，不拼英文错误码（错误码在 error.errCode）；宿主只给错误码，没列出的码给通用提示。 */
 function describeError(error) {
   const code = error instanceof CloudError ? error.errCode : error?.errCode ?? (error instanceof Error ? error.message : String(error));
   const hints = {
@@ -36,7 +36,7 @@ function describeError(error) {
     RUNTIME_UNAVAILABLE: '云服务暂时不可用，请稍后重试。',
     RELEASE_UNAVAILABLE: '应用版本已切换，请重新加载应用。',
   };
-  return hints[code] ? `${hints[code]}（${code}）` : code;
+  return hints[code] ?? '操作没有完成，请稍后重试。';
 }
 
 function showError(error, title = '出了点问题') {

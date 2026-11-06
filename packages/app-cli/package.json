@@ -22,12 +22,10 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "@zleap-ai/app-cli-darwin-arm64": "0.12.0",
-    "@zleap-ai/app-cli-darwin-x64": "0.12.0",
+    "@zleap-ai/app-cli-darwin": "0.12.0",
     "@zleap-ai/app-cli-linux-x64": "0.12.0",
     "@zleap-ai/app-cli-linux-arm64": "0.12.0",
-    "@zleap-ai/app-cli-win32-x64": "0.12.0",
-    "@zleap-ai/app-cli-win32-arm64": "0.12.0"
+    "@zleap-ai/app-cli-win32-x64": "0.12.0"
   },
   "keywords": [
     "zleap",

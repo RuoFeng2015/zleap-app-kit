@@ -1,4 +1,5 @@
 // 读取 kit.config.json 及常用路径。所有构建/发布脚本共用。
+import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +18,7 @@ export const paths = {
 };
 
 export function platformSuffix(platform) {
-  return `${platform.os}-${platform.cpu}`;
+  return platform.key;
 }
 
 export function platformPackageName(platform) {
@@ -30,6 +31,21 @@ export function platformDir(platform) {
 
 export function readJSON(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
+}
+
+/** SDK 事实源目录（CLI 内嵌的公开 SDK）。build-sdk 打包它，CLI 二进制也把它编进去。 */
+export function sdkSourceDir(source) {
+  return join(source, 'internal', 'appdevcli', 'templates', 'todo', 'sdk');
+}
+
+/** SDK 源码指纹：build-sdk 记进 dist/build-info.json，build-cli 记进 checksums.json，发布时用来比较两者是否同一份。 */
+export function sdkSourceDigest(dir, style = 'zleap.css') {
+  const files = readdirSync(dir)
+    .filter((name) => name.endsWith('.js') || name.endsWith('.d.ts') || name === style)
+    .sort();
+  const hash = createHash('sha256');
+  for (const name of files) hash.update(name).update('\0').update(readFileSync(join(dir, name)));
+  return { files, digest: hash.digest('hex') };
 }
 
 /** 递归复制目录（不保留源目录权限位；某些网络/虚拟文件系统上 fs.cpSync 会因权限位失败）。 */

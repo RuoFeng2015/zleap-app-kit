@@ -1,32 +1,26 @@
 {
-  "darwin-arm64": {
-    "file": "bin/zleap-app",
-    "sha256": "c34819c3ecb4dba2aac4e0206689fc8294476be2f5ec1c2e4a29789321cfc231",
-    "commit": "5437f815"
-  },
   "linux-x64": {
     "file": "bin/zleap-app",
-    "sha256": "6dec1fc6a55709f2d0a87e30b762a365f1c10c88c0bf85abb2844f2e0ec49427",
-    "commit": "5437f815"
+    "sha256": "383ed903a467ad3be14db52059851770a92c7f2f08654549798fcf67eeaa4841",
+    "commit": "f96a1e41",
+    "sdk": "593b98bd6d4f1600d48579da161460f6e38403fd35164621668a31dfeecab21f"
   },
   "linux-arm64": {
     "file": "bin/zleap-app",
-    "sha256": "e5c9c9a641ac7fa3638ba335b61bfd347185d4e847feb60457366c6808da66e0",
-    "commit": "5437f815"
-  },
-  "darwin-x64": {
-    "file": "bin/zleap-app",
-    "sha256": "36e04676fb4db1813b5394f6fb26960eb1fa2a828a8a70f25477d3f755390b4b",
-    "commit": "5437f815"
+    "sha256": "2ebd6ff6d1f0fa35f5b5aa634a9fc3c3abcd5b0089629b52b622ba93ce5d24e0",
+    "commit": "f96a1e41",
+    "sdk": "593b98bd6d4f1600d48579da161460f6e38403fd35164621668a31dfeecab21f"
   },
   "win32-x64": {
     "file": "bin/zleap-app.exe",
-    "sha256": "81e9a52292764163385366f2e8aad7417cae4746f3bd1dd3fd8bb0700470df08",
-    "commit": "5437f815"
+    "sha256": "595190d1d319c1468a67d0933760dbdeaafaa7b19959aa539f4d904e3dcfea72",
+    "commit": "f96a1e41",
+    "sdk": "593b98bd6d4f1600d48579da161460f6e38403fd35164621668a31dfeecab21f"
   },
-  "win32-arm64": {
-    "file": "bin/zleap-app.exe",
-    "sha256": "9e5755ac5d95af4a0b05deb0d1c8f1a6de08a9150c50b7a3650d58e7cb7f3a8e",
-    "commit": "5437f815"
+  "darwin": {
+    "file": "bin/zleap-app",
+    "sha256": "dcf6d07e25ce4156ed59bd3895ba24b21392688e4d63fa25f986aee7cceee99e",
+    "commit": "f96a1e41",
+    "sdk": "593b98bd6d4f1600d48579da161460f6e38403fd35164621668a31dfeecab21f"
   }
 }

@@ -37,4 +37,4 @@ const { data } = await db.collection('todos').orderBy('created_at', 'desc').limi
 
 ## 版本与许可
 
-与 `@zleap-ai/app-cli` 同版本发布。专有许可，仅限在 zleapOS 应用中使用，见 [LICENSE](./LICENSE)。
+版本独立于 `@zleap-ai/app-cli`（SDK 只和 zleapOS 宿主握手，不依赖 CLI 版本）。专有许可，仅限在 zleapOS 应用中使用，见 [LICENSE](./LICENSE)。

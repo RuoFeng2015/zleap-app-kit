@@ -34,15 +34,15 @@ my-todo/
 
 SDK 版本与 `zleap-app` 可执行文件一起发布。用 `npm create zleap-app` 生成的 React 项目改为依赖 npm 包
 `@zleap-ai/app-sdk`：`@zleap-ai/app-sdk` 对应 `sdk/index.js`，`/host` 对应 `sdk/zleap-sdk.js`，`/workspace` 对应 `sdk/workspace.js`，
-API 完全相同，版本与 `@zleap-ai/app-cli` 保持一致（同为 `0.10.x`）：
+API 完全相同。SDK 与 `@zleap-ai/app-cli` 各自发版，版本号不必相同：
 
 ```bash
-npm i @zleap-ai/app-sdk
-npm i -D @zleap-ai/app-cli      # 两者同版本，握手协议才匹配
+npm i @zleap-ai/app-sdk@latest
+npm i -D @zleap-ai/app-cli@latest
 ```
 
 **不要**再从 `zleap-web` 源码自行构建、复制 SDK——旧文档里的做法已过时，
-版本不匹配会在握手时报 `PROTOCOL_MISMATCH`。
+与宿主协议不匹配的 SDK 会在握手时报 `PROTOCOL_MISMATCH`。
 
 > **三种「存储」别混用**（提示）
 >

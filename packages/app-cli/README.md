@@ -1,7 +1,7 @@
 # @zleap-ai/app-cli
 
 zleapOS 云开发命令行工具 `zleap-app` 的 npm 发行版。安装时 npm 只会下载与你的系统匹配的那一个预编译二进制
-（`@zleap-ai/app-cli-<os>-<arch>`），不需要 Go 环境。
+（`@zleap-ai/app-cli-darwin` / `-linux-x64` / `-linux-arm64` / `-win32-x64`），不需要 Go 环境。
 
 ```bash
 npx @zleap-ai/app-cli                 # 查看版本与命令列表
@@ -9,7 +9,7 @@ npm i -D @zleap-ai/app-cli            # 作为项目开发依赖（脚手架默�
 npx zleap-app check ./dist
 ```
 
-支持平台：macOS（arm64 / x64）、Linux（x64 / arm64）、Windows（x64 / arm64）。
+支持平台：macOS（arm64 / x64，同一个通用二进制）、Linux（x64 / arm64）、Windows（x64；Windows 11 on ARM 用系统自带的 x64 仿真运行同一个包）。
 
 ## 常用命令
 

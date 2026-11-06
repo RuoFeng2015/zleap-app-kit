@@ -23,7 +23,7 @@
 - **一切先声明**：集合与结构写在 `manifest.json` 的 `data.collections` + `data.schemas`；权限写在 `runtime.capabilities.requires`。没声明的运行时一律拿不到。
 - **集合结构上线后不可改**：已建集合不会随新版本更新 Schema，改字段要新建集合并迁移。`additionalProperties` 缺省按 `false`。
 - **沙箱**：opaque origin + CSP `connect-src 'none'`、`worker-src 'none'`、只允许包内脚本/样式/字体。不能 `fetch`、不能用外部 CDN/字体、不能用 `localStorage`、不能 `alert/confirm`、不能开 Worker。
-- **只通过 `src/cloud/` 访问 SDK**；环境用 `DYNAMIC_CURRENT_ENV`，不要写死 dev/prod。SDK 是 npm 包 `@zleap-ai/app-sdk`（另有 `/host` 宿主能力、`/workspace` 工作区入口），API 以 `node_modules/@zleap-ai/app-sdk/dist/types/*.d.ts` 为准；升级 SDK 时与 `@zleap-ai/app-cli` 保持同版本。
+- **只通过 `src/cloud/` 访问 SDK**；环境用 `DYNAMIC_CURRENT_ENV`，不要写死 dev/prod。SDK 是 npm 包 `@zleap-ai/app-sdk`（另有 `/host` 宿主能力、`/workspace` 工作区入口），API 以 `node_modules/@zleap-ai/app-sdk/dist/types/*.d.ts` 为准；SDK 与 `@zleap-ai/app-cli` 各自独立发版，升级时都装 `@latest` 即可。
 - **单次读取最多 100 条**，用 `skip` 翻页（skip ≤ 1000）。更新/删除带 `expectedVersion`。
 - **结果未知不重试**：`COMMIT_UNKNOWN` 时先重读核对；部署脚本退出码 6 同理。
 - **明确失败优于假成功**：不要用模拟数据、假登录或吞掉错误来让界面「看起来能用」。

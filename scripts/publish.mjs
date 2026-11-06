@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// 按依赖顺序发布：6 个平台子包 → CLI 主包 → SDK → create-zleap-app。
+// 按依赖顺序发布：平台子包 → CLI 主包 → SDK → create-zleap-app。
+// registry 上已有的版本直接跳过，也不要求本地有它的产物：只改了 SDK 时不用编译 CLI，只改了模板时两者都不用构建。
 //
 //   node scripts/publish.mjs --dry-run          # 只做 npm publish --dry-run
 //   node scripts/publish.mjs --tag next         # 发布到指定 dist-tag
@@ -7,13 +8,13 @@
 //   --otp 123456                                # 账号开了 2FA 且 token 不能绕过时，附带一次性验证码
 //   --only create-zleap-app,@zleap-ai/app-sdk   # 只发布指定包（中途失败后续发）
 //
-// 发布前会做：sync --check、SDK/skills 引用一致性（如传 --source/--docs）、二进制校验值核对。
+// 发布前会做：sync --check；对要发布的包核对 SDK 产物（build-sdk --check）与二进制校验值。
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { arg, config, flag, paths, platformDir, platformSuffix, readJSON } from './lib/config.mjs';
+import { arg, config, flag, paths, platformDir, platformPackageName, platformSuffix, readJSON } from './lib/config.mjs';
 
 const dryRun = flag('dry-run');
 const tag = arg('tag', 'latest');
@@ -30,26 +31,43 @@ step('核对包名、版本与随附 skills', () => {
   execFileSync(process.execPath, [join(paths.root, 'scripts', 'sync.mjs'), '--check'], { stdio: 'inherit' });
 });
 
-step('核对 SDK 产物由当前源码构建', () => {
-  const args = [join(paths.root, 'scripts', 'build-sdk.mjs'), '--check'];
-  if (arg('source')) args.push('--source', String(arg('source')));
-  execFileSync(process.execPath, args, { stdio: 'inherit' });
-});
+/** 该版本是否已在 registry 上（重跑时跳过，npm 同一版本只能发布一次）。 */
+function published(name, version) {
+  const result = spawnSync(npm, ['view', `${name}@${version}`, 'version'], { encoding: 'utf8', shell: process.platform === 'win32' });
+  return result.status === 0 && result.stdout.trim() === version;
+}
+
+// 发布清单（按依赖顺序）。平台包的 package.json 由 build-cli 生成，没构建过时按 kit.config.json 推出名称与版本。
+const targets = [
+  ...config.platforms.map((platform) => ({ dir: platformDir(platform), name: platformPackageName(platform), version: config.cliVersion, platform })),
+  ...[paths.cli, paths.sdk, paths.create].map((dir) => ({ dir, ...readJSON(join(dir, 'package.json')) })),
+].filter((target) => !only || only.includes(target.name));
+
+let skipped = 0;
+const todo = [];
+for (const target of targets) {
+  if (published(target.name, target.version)) {
+    console.log(`• 跳过 ${target.name}@${target.version}（已发布）`);
+    skipped++;
+  } else todo.push(target);
+}
+if (todo.length === 0) {
+  console.log('\n没有需要发布的包：先在 kit.config.json 里递增要发的那条版本（cliVersion / sdkVersion / createVersion），再 npm run sync。');
+  process.exit(0);
+}
 
 const checksums = existsSync(join(paths.npm, 'checksums.json')) ? readJSON(join(paths.npm, 'checksums.json')) : {};
-const targets = [];
-for (const platform of config.platforms) {
-  const dir = platformDir(platform);
+for (const { dir, platform } of todo.filter((target) => target.platform)) {
   const key = platformSuffix(platform);
   const pkg = existsSync(join(dir, 'package.json')) ? readJSON(join(dir, 'package.json')) : null;
   const exe = platform.goos === 'windows' ? 'zleap-app.exe' : 'zleap-app';
   const binary = join(dir, 'bin', exe);
   if (!pkg || !existsSync(binary)) {
-    console.error(`缺少 ${key} 平台包，先运行 node scripts/build-cli.mjs --source <zleap-service>`);
+    console.error(`缺少 ${key} 平台包，先运行 npm run build:cli -- --source ../zleap-service`);
     process.exit(1);
   }
-  if (pkg.version !== config.version) {
-    console.error(`${pkg.name} 版本 ${pkg.version} 与 kit.config.json ${config.version} 不一致，请重新构建`);
+  if (pkg.version !== config.cliVersion) {
+    console.error(`${pkg.name} 版本 ${pkg.version} 与 kit.config.json 的 cliVersion ${config.cliVersion} 不一致，请重新构建`);
     process.exit(1);
   }
   const digest = createHash('sha256').update(readFileSync(binary)).digest('hex');
@@ -57,14 +75,23 @@ for (const platform of config.platforms) {
     console.error(`${key} 二进制与 checksums.json 不一致，请重新构建`);
     process.exit(1);
   }
-  targets.push(dir);
 }
-targets.push(paths.cli, paths.sdk, paths.create);
 
-/** 该版本是否已在 registry 上（重跑时跳过，npm 同一版本只能发布一次）。 */
-function published(name, version) {
-  const result = spawnSync(npm, ['view', `${name}@${version}`, 'version'], { encoding: 'utf8', shell: process.platform === 'win32' });
-  return result.status === 0 && result.stdout.trim() === version;
+if (todo.some((target) => target.dir === paths.sdk)) {
+  step('核对 SDK 产物由当前源码构建', () => {
+    const args = [join(paths.root, 'scripts', 'build-sdk.mjs'), '--check'];
+    if (arg('source')) args.push('--source', String(arg('source')));
+    execFileSync(process.execPath, args, { stdio: 'inherit' });
+  });
+  // CLI 二进制内嵌一份 SDK（MCP 的 SDK 参考、原生模板）。只发 SDK 不发 CLI 时那份会旧一版：不影响应用运行，只提示。
+  const built = readJSON(join(paths.sdk, 'dist', 'build-info.json')).source;
+  const embedded = new Set(config.platforms.map((platform) => checksums[platformSuffix(platform)]?.sdk));
+  if (embedded.size !== 1 || !embedded.has(built)) {
+    console.log(
+      '  提示：CLI 内嵌的 SDK 副本与这次发布的 SDK 不是同一份（只影响 MCP 的 SDK 参考与原生模板，不影响应用运行）；' +
+        '下次 CLI 有改动时一起递增 cliVersion 并 build:cli 即可。',
+    );
+  }
 }
 
 /** 这个包在 registry 上有哪些版本（不存在返回 []）。 */
@@ -110,17 +137,9 @@ const failureHelp =
   '已发布的包重跑时会自动跳过：npm run release -- --source ../zleap-service';
 
 let done = 0;
-let skipped = 0;
 const staged = [];
 const processing = [];
-for (const dir of targets) {
-  const { name, version } = readJSON(join(dir, 'package.json'));
-  if (only && !only.includes(name)) continue;
-  if (!dryRun && published(name, version)) {
-    console.log(`• 跳过 ${name}@${version}（已发布）`);
-    skipped++;
-    continue;
-  }
+for (const { dir, name, version } of todo) {
   console.log(`• ${dryRun ? '[dry-run] ' : ''}发布 ${name}@${version}（tag ${tag}）`);
   const args = ['publish', '--access', 'public', '--tag', String(tag)];
   if (dryRun) args.push('--dry-run');
@@ -164,9 +183,7 @@ console.log(dryRun ? '\ndry-run 完成' : `\n完成：新上线 ${done} 个，�
 // 真正的版本要维护者用 2FA 批准后才上线。这里逐个核对，免得以为发完了。
 if (!dryRun) {
   const waiting = [];
-  for (const dir of targets) {
-    const { name, version } = readJSON(join(dir, 'package.json'));
-    if (only && !only.includes(name)) continue;
+  for (const { name, version } of todo) {
     if (!published(name, version)) waiting.push(`${name}@${version}`);
   }
   if (waiting.length) {

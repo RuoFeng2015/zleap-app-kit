@@ -1,22 +1,26 @@
 'use strict';
 // 解析当前平台对应的 zleap-app 预编译二进制。
 // 查找顺序：ZLEAP_APP_BINARY 环境变量 → 平台子包（optionalDependencies）→ 报错并给出修复建议。
-// 不在安装阶段联网下载，也不回退到其他平台的二进制。
+// 不在安装阶段联网下载；除下表明确列出的仿真运行外，不回退到其他平台的二进制。
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-// 平台子包命名为「主包名-平台-架构」，主包改名（kit.config.json）时自动跟随。
+// 平台子包命名为「主包名-<key>」，主包改名（kit.config.json）时自动跟随。
 const BASE = require('../package.json').name;
 
-const SUPPORTED = new Set([
-  'darwin-arm64',
-  'darwin-x64',
-  'linux-x64',
-  'linux-arm64',
-  'win32-x64',
-  'win32-arm64',
-]);
+// 运行平台 → 平台子包 key。与 kit.config.json 的 platforms 对应（npm run check 会核对）：
+// macOS 两种架构共用一个通用二进制；Windows 11 on ARM 用自带的 x64 仿真跑 win32-x64。
+const PACKAGES = {
+  'darwin-arm64': 'darwin',
+  'darwin-x64': 'darwin',
+  'linux-x64': 'linux-x64',
+  'linux-arm64': 'linux-arm64',
+  'win32-x64': 'win32-x64',
+  'win32-arm64': 'win32-x64',
+};
+
+const SUPPORTED = new Set(Object.keys(PACKAGES));
 
 function platformKey(platform = process.platform, arch = process.arch) {
   return `${platform}-${arch}`;
@@ -27,7 +31,8 @@ function binaryName(platform = process.platform) {
 }
 
 function platformPackage(platform = process.platform, arch = process.arch) {
-  return `${BASE}-${platformKey(platform, arch)}`;
+  const key = platformKey(platform, arch);
+  return `${BASE}-${PACKAGES[key] || key}`;
 }
 
 class BinaryNotFoundError extends Error {
@@ -77,4 +82,4 @@ function resolveBinary(options = {}) {
   return binary;
 }
 
-module.exports = { resolveBinary, platformKey, platformPackage, binaryName, BinaryNotFoundError, SUPPORTED };
+module.exports = { resolveBinary, platformKey, platformPackage, binaryName, BinaryNotFoundError, SUPPORTED, PACKAGES };

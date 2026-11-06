@@ -4,9 +4,10 @@
 //   node scripts/sync.mjs           # 写入
 //   node scripts/sync.mjs --check   # 只检查是否一致（CI 用）
 import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, relative } from 'node:path';
 
-import { config, copyDir, flag, paths, platformPackageName } from './lib/config.mjs';
+import { config, copyDir, flag, paths, platformPackageName, platformSuffix } from './lib/config.mjs';
 
 const check = flag('check');
 const problems = [];
@@ -28,14 +29,26 @@ const repo = { type: 'git', url: `git+${config.repositoryUrl}.git` };
 
 updateJSON(join(paths.cli, 'package.json'), (pkg) => {
   pkg.name = config.cliPackage;
-  pkg.version = config.version;
+  pkg.version = config.cliVersion;
   pkg.repository = { ...repo, directory: 'packages/app-cli' };
-  pkg.optionalDependencies = Object.fromEntries(config.platforms.map((p) => [platformPackageName(p), config.version]));
+  pkg.optionalDependencies = Object.fromEntries(config.platforms.map((p) => [platformPackageName(p), config.cliVersion]));
 });
+
+// resolve.js 的「运行平台 → 平台子包」表随主包发布、不读 kit.config.json，两边必须对得上：
+// 每个平台包声明的 os-cpu 都要解析回它自己，表里也不能指向不存在的平台包。
+const { PACKAGES } = createRequire(import.meta.url)(join(paths.cli, 'lib', 'resolve.js'));
+const declared = Object.fromEntries(config.platforms.flatMap((p) => p.cpu.map((cpu) => [`${p.os}-${cpu}`, platformSuffix(p)])));
+const unresolved = [...new Set([...Object.keys(declared), ...Object.keys(PACKAGES)])]
+  .filter((key) => PACKAGES[key] !== declared[key])
+  .map((key) => `${key}：resolve.js 为 ${PACKAGES[key] ?? '（缺）'}，kit.config.json 为 ${declared[key] ?? '（缺）'}`);
+if (unresolved.length) {
+  console.error(`packages/app-cli/lib/resolve.js 的 PACKAGES 与 kit.config.json 的 platforms 不一致（需手动改）：\n  ${unresolved.join('\n  ')}`);
+  process.exit(1);
+}
 
 updateJSON(join(paths.sdk, 'package.json'), (pkg) => {
   pkg.name = config.sdkPackage;
-  pkg.version = config.version;
+  pkg.version = config.sdkVersion;
   pkg.repository = { ...repo, directory: 'packages/app-sdk' };
 });
 
@@ -50,12 +63,12 @@ for (const rel of ['src/cloud/client.ts']) {
   }
 }
 
-// create-zleap-app 无 scope，版本独立（createVersion，缺省跟随 version）：CLI/SDK 不重编时也能单独重发脚手架。
+// create-zleap-app 无 scope，版本独立：只改了模板 / skills 时只发它。生成的项目按这里写入的 CLI / SDK 版本装依赖。
 updateJSON(join(paths.create, 'package.json'), (pkg) => {
   pkg.name = config.createPackage;
-  pkg.version = config.createVersion ?? config.version;
+  pkg.version = config.createVersion;
   pkg.repository = { ...repo, directory: 'packages/create-zleap-app' };
-  pkg.zleapKit = { cliPackage: config.cliPackage, cliVersion: config.version, sdkPackage: config.sdkPackage, sdkVersion: config.version, skillsRepo: config.skillsRepo };
+  pkg.zleapKit = { cliPackage: config.cliPackage, cliVersion: config.cliVersion, sdkPackage: config.sdkPackage, sdkVersion: config.sdkVersion, skillsRepo: config.skillsRepo };
 });
 
 // skills → create-zleap-app/skills（npm 包里随附，脚手架离线可装）
@@ -94,10 +107,10 @@ if (existsSync(bundled)) {
   }
 }
 
-// Claude Code 插件市场清单（/plugin marketplace add <repo>）
+// Claude Code 插件市场清单（/plugin marketplace add <repo>）：skills 随 create-zleap-app 发布，版本跟它走。
 updateJSON(join(paths.root, '.claude-plugin', 'marketplace.json'), (market) => {
-  market.metadata = { ...(market.metadata ?? {}), version: config.version };
-  for (const plugin of market.plugins ?? []) plugin.version = config.version;
+  market.metadata = { ...(market.metadata ?? {}), version: config.createVersion };
+  for (const plugin of market.plugins ?? []) plugin.version = config.createVersion;
 });
 
 if (check) {

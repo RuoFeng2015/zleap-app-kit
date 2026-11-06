@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { resolveBinary, platformPackage, BinaryNotFoundError } = require('../packages/app-cli/lib/resolve.js');
+const { resolveBinary, platformPackage, BinaryNotFoundError, SUPPORTED } = require('../packages/app-cli/lib/resolve.js');
 const shim = fileURLToPath(new URL('../packages/app-cli/bin/zleap-app.js', import.meta.url));
 
 function fakePlatformPackage(withBinary = true) {
@@ -23,8 +23,33 @@ function fakePlatformPackage(withBinary = true) {
 }
 
 test('平台包命名跟随主包名', () => {
-  assert.equal(platformPackage('darwin', 'arm64'), '@zleap-ai/app-cli-darwin-arm64');
+  assert.equal(platformPackage('darwin', 'arm64'), '@zleap-ai/app-cli-darwin');
+  assert.equal(platformPackage('linux', 'arm64'), '@zleap-ai/app-cli-linux-arm64');
   assert.equal(platformPackage('win32', 'x64'), '@zleap-ai/app-cli-win32-x64');
+});
+
+test('macOS 两种架构共用通用二进制，Windows on ARM 用 x64 包', () => {
+  assert.equal(platformPackage('darwin', 'x64'), platformPackage('darwin', 'arm64'));
+  assert.equal(platformPackage('win32', 'arm64'), '@zleap-ai/app-cli-win32-x64');
+  const dir = fakePlatformPackage();
+  const found = resolveBinary({
+    env: {},
+    platform: 'darwin',
+    arch: 'x64',
+    resolve: (id) => {
+      assert.equal(id, '@zleap-ai/app-cli-darwin/package.json');
+      return join(dir, 'package.json');
+    },
+  });
+  assert.equal(found, join(dir, 'bin', 'zleap-app'));
+});
+
+test('主包的 optionalDependencies 覆盖每个受支持平台要用的包', () => {
+  const { optionalDependencies } = require('../packages/app-cli/package.json');
+  for (const key of SUPPORTED) {
+    const [platform, arch] = key.split('-');
+    assert.ok(platformPackage(platform, arch) in optionalDependencies, key);
+  }
 });
 
 test('按平台解析二进制', () => {
