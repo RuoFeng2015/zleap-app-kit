@@ -1,8 +1,8 @@
 {
   "$comment": "发布坐标集中在这里。改名只改这一个文件，然后运行 npm run sync。",
-  "version": "0.10.1",
+  "version": "0.12.0",
   "$commentCreateVersion": "create-zleap-app 是不带 scope 的独立包，版本与 CLI/SDK 解耦：CLI/SDK/平台子包不重编时单独递增它即可。",
-  "createVersion": "0.10.6",
+  "createVersion": "0.12.0",
   "npmScope": "@zleap-ai",
   "cliPackage": "@zleap-ai/app-cli",
   "sdkPackage": "@zleap-ai/app-sdk",

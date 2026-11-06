@@ -20,6 +20,8 @@ const check = flag('check');
 
 /** 包入口 → 源文件。三个入口彼此独立（宿主 SDK 与工作区模块本身零 import）。 */
 export const ENTRIES = { index: 'index.js', host: 'zleap-sdk.js', workspace: 'workspace.js' };
+/** 应用官方样式：原样分发（不混淆），vanilla 部署时复制到 app/sdk/，React 里 import '@zleap-ai/app-sdk/zleap.css'。 */
+export const STYLE = 'zleap.css';
 
 if (!existsSync(from)) {
   console.error(`找不到 SDK 源目录：${from}\n用 --source 指向 zleap-service 仓库。`);
@@ -27,7 +29,7 @@ if (!existsSync(from)) {
 }
 
 const sourceFiles = readdirSync(from)
-  .filter((name) => name.endsWith('.js') || name.endsWith('.d.ts'))
+  .filter((name) => name.endsWith('.js') || name.endsWith('.d.ts') || name === STYLE)
   .sort();
 const sourceDigest = createHash('sha256');
 for (const name of sourceFiles) sourceDigest.update(name).update('\0').update(readFileSync(join(from, name)));
@@ -72,6 +74,12 @@ const result = await esbuild.build({
   metafile: true,
   logLevel: 'warning',
 });
+
+if (!existsSync(join(from, STYLE))) {
+  console.error(`SDK 源目录缺少 ${STYLE}`);
+  process.exit(1);
+}
+copyFileSync(join(from, STYLE), join(dist, STYLE));
 
 // 类型声明保持可读：开发者与 AI 编程工具靠它理解 API。
 for (const name of sourceFiles.filter((file) => file.endsWith('.d.ts'))) {

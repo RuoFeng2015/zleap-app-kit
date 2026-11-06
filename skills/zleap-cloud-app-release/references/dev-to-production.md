@@ -125,6 +125,72 @@ npm run deploy
 - 命令是 `zleap-app test <plan.json> --runner-config <运行器配置>`，第一个参数是**计划文件**，不是应用目录；
 - 报告用 `zleap-app logs <report_id>` 查看。只用专用测试账号和测试数据。
 
+#### 验收计划怎么写
+
+验收由运维或你本人在本机准备的「运行器」执行，分两份文件：运行器配置（含测试账号，只放本机）和验收计划（描述要点什么、核对什么）。
+AI 工具通过 MCP 调用时用同一份运行器配置：启动 `zleap-app mcp serve` 时加 `--runner-config`，再用 `app_test` 提交计划。
+
+**运行器配置**：JSON 文件，权限 0600，放在应用目录之外，绝不能打进应用包。
+
+| 字段                                  | 说明                                                                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node`、`puppeteer_module`、`browser` | Node.js（≥ 22.12）、Puppeteer Core（≥ 25）入口和 Chrome 可执行文件的绝对路径                                                                           |
+| `auth_file`                           | 测试账号认证 JSON 的绝对路径（含 `access_token`，可含 `refresh_token`，0600）。由你用专用账号正常登录获得，只给运行器读取，不能放进 MCP 参数或交给应用 |
+| `os_url`、`target`                    | 目标 OS 地址                                                                                                                                           |
+| `app_key`                             | 固定为本应用（appid）                                                                                                                                  |
+| `app_id`、`app_name`                  | 可留空，由当前会话的发布记录按不可变 `version_id` 解析                                                                                                 |
+| `allow_mutation`                      | 必须显式写 `true`，表示允许验收写入专用测试数据                                                                                                        |
+| `probes`                              | 探针名到同一部署只读 API 路径的映射，例如 `{"todos": "/api/v1/…"}`；参数按 `app_api_get` 查到的契约填写                                                |
+
+测试账号必须和开发会话是同一个账号。可用的探针名可以用 `app_caps_get` 查看（`acceptance_runner.configured` 与 `probe_names`），
+计划里只能引用这里配置过的探针，不接受应用传入新的 URL、身份、脚本或浏览器跳转。
+
+**验收计划**：`app_key`、`version_id` 和 4 到 128 个 `steps`。每一步都要写 `phase`，取值 `read`、`write` 或 `persistence`；
+`target` 可选 `app`（应用窗口内）或 `host`（宿主页面）。可用的动作：
+
+| 动作                      | 必填字段                                                     | 说明                                                                                       |
+| ------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `click`、`fill`、`select` | `selector`                                                   | 交互，`fill` / `select` 用 `value` 给出要填或要选的值；放在 `write` 阶段时算一次真实写操作 |
+| `click_text`              | `text`                                                       | 按文字点击                                                                                 |
+| `assert_text`             | `text`                                                       | 页面出现指定文字                                                                           |
+| `assert_count`            | `selector`、`count`（0–10000）                               | 匹配元素的数量                                                                             |
+| `assert_image`            | `selector`                                                   | 图片必须真正解码成功、宽高非零，只检查有 `img` 标签不算通过                                |
+| `probe`                   | `probe`，以及 `expected` 或非空 `contains`（可配 `pointer`） | 用运行器配置里的探针独立读取数据核对                                                       |
+| `reload`                  | —                                                            | 刷新页面                                                                                   |
+
+编排规则，运行器会逐条校验：
+
+1. 必须有 `read` 阶段的断言。
+2. 必须有 `write` 阶段的真实写操作，并在写之后用 `probe` 独立核对数据。
+3. `reload` 只能放在写操作和写后探针之后。
+4. `persistence` 阶段的断言必须在 `reload` 之后，证明刷新后数据还在。
+
+示例（待办应用：读取列表，新增一条，探针核对，刷新后确认还在）：
+
+```json
+{
+  "app_key": "<appid>",
+  "version_id": "<要验收的版本 ID>",
+  "steps": [
+    { "phase": "read", "action": "assert_text", "target": "app", "text": "待办" },
+    {
+      "phase": "write",
+      "action": "fill",
+      "target": "app",
+      "selector": "input[name=title]",
+      "value": "验收-001"
+    },
+    { "phase": "write", "action": "click_text", "target": "app", "text": "添加" },
+    { "phase": "write", "action": "probe", "probe": "todos", "contains": "验收-001" },
+    { "phase": "persistence", "action": "reload" },
+    { "phase": "persistence", "action": "assert_text", "target": "app", "text": "验收-001" }
+  ]
+}
+```
+
+选择器和文字按你自己的页面填写，动作名以 `app_spec_get(section=acceptance)` 返回的 schema 为准。
+报告 `status` 为 `passed` 且 `browser_tested` 为 `true` 才算通过。验收期间如果版本发生变化，结果作废，需要重新验收。
+
 （截图：部署后的应用窗口：OS 已连接，能读写待办，见文档站）
 
 > **开发环境只对应用成员开放**（说明）

@@ -419,6 +419,10 @@
 `zleap-app publish` 等写操作网络结果不明时返回 `COMMIT_UNKNOWN`，**不会自动重传**：
 用 `zleap-app operation --request-id <原操作号>` 或 `zleap-app status` 查询原结果。
 
+`zleap-app business get` / `call`（以及 MCP 的 `os_business_get` / `os_business_call`）请求超管、账号与组织、内部控制或未审核的接口时，
+返回 403 `OPERATION_NOT_EXPOSED`。应用页面直接调用 OS 接口时，未向应用开放的接口同样返回 `OPERATION_NOT_EXPOSED`（「该接口未向应用开放」）。
+这类接口不会开放，先用 `business search` 找可用的替代接口。
+
 ## 上传与 Manifest 校验
 
 上传、`zleap-app check` 或安装时，Manifest 相关失败通过 `detail.reason` 返回：

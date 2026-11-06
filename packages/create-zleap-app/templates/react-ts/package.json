@@ -3,11 +3,15 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "zleap": {
+    "packageDir": "dist"
+  },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
     "dev": "vite",
+    "preview": "node scripts/zleap.mjs preview",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "check": "npm run build && zleap-app check dist",
