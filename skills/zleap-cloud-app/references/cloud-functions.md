@@ -168,8 +168,8 @@ export async function main(event, context) {
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Node 版本             | **以实际部署镜像为准。** `node-lts/1` 画像在 `profile.json` 里登记为 Node 24.21.0（linux / arm64，非 root），但仓库中的沙箱镜像 Dockerfile 目前基于 `node:22-bookworm-slim`，两者尚未对齐。请勿依赖 Node 22 之后才有的特性，也不要写死补丁版本 |
 | 网络                  | **无**（`network_policy: none`）——函数里不能 `fetch` 外部地址                                                                                                                                                                                  |
-| `timeout_seconds`     | 1–300，默认 30                                                                                                                                                                                                                                 |
-| `memory_mb`           | 64–4096，默认 512                                                                                                                                                                                                                              |
+| `timeout_seconds`     | 1–300，默认 30；`node-lts/1` 实际上限 30，写更大按 30 执行                                                                                                                                                                                                   |
+| `memory_mb`           | 64–4096，默认 512；`node-lts/1` 实际上限 512，写更大按 512 执行                                                                                                                                                                                                |
 | CPU / 进程数 / 临时盘 | 1000 millicore / 64 / 64 MB（固定，不可配置）                                                                                                                                                                                                  |
 | 返回值大小            | ≤ 256 KiB                                                                                                                                                                                                                                      |
 | 日志                  | 每次调用 ≤ 1 MiB，单行 ≤ 16 KiB                                                                                                                                                                                                                |
@@ -857,7 +857,7 @@ const job = await zl.cloud.os.capabilities.invoke({
 
 ### `FUNCTION_DEADLINE_EXCEEDED`
 
-超过 `deadlineAt`。长任务请拆成多步，或调大 `timeout_seconds`（≤300）。
+超过 `deadlineAt`。长任务请拆成多步（每步在 30 秒内完成，用作业或触发器串起来）；`node-lts/1` 下 `timeout_seconds` 实际上限 30，调大没有效果。
 
 ### 云函数里读写被拒
 
