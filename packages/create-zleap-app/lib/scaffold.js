@@ -153,6 +153,19 @@ export function detectPackageManager(userAgent = process.env.npm_config_user_age
 }
 
 /**
+ * 包管理器专用配置，生成项目时写入（已存在则不覆盖），让项目装完依赖即可用：
+ * - yarn 4 默认 Plug'n'Play，没有 node_modules/.bin：scripts/zleap.mjs 与 .mcp.json 里的 npx zleap-app 都找不到 CLI；
+ * - pnpm 10 起默认拦截依赖的构建脚本，pnpm 12 的 install 因此以非 0 退出（Vite 依赖的 esbuild 需要 postinstall），
+ *   新版用 allowBuilds，旧版（10/11）用 onlyBuiltDependencies，两个都写。
+ * 全流程测试 e6-11091657-468 PKG-07。
+ */
+export function packageManagerFiles(pm) {
+  if (pm === 'yarn') return { '.yarnrc.yml': 'nodeLinker: node-modules\n' };
+  if (pm === 'pnpm') return { 'pnpm-workspace.yaml': 'allowBuilds:\n  esbuild: true\nonlyBuiltDependencies:\n  - esbuild\n' };
+  return {};
+}
+
+/**
  * 「接下来」里运行项目脚本的命令。一律带 run：`pnpm deploy`、`pnpm login`、`yarn login` 是包管理器自己的内置命令
  * （工作区部署 / 登录 npm 仓库），不会执行项目里的 deploy、login 脚本。npm 需要 `--` 才把参数交给脚本，其余直接跟在后面。
  */

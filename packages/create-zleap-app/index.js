@@ -17,6 +17,7 @@ import {
   TEMPLATES,
   detectPackageManager,
   installSkills,
+  packageManagerFiles,
   runScriptCommand,
   isEmptyDir,
   nodeVersionProblem,
@@ -154,6 +155,9 @@ async function main() {
     }
 
     const pm = options.pm || detectPackageManager();
+    for (const [name, content] of Object.entries(packageManagerFiles(pm))) {
+      if (!existsSync(join(targetDir, name))) writeFileSync(join(targetDir, name), content);
+    }
     let installed = false;
     if (options.install) {
       console.log(`\n使用 ${pm} 安装依赖…`);
