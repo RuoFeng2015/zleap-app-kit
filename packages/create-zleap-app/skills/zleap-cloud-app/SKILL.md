@@ -26,6 +26,9 @@ zleapOS 云开发应用 = 一个网页（运行在 zleapOS 桌面的沙箱 ifram
 React 模板、vanilla 模板、原生模板走同一条路线。目的是不重复造轮子、少踩运行时限制：
 
 1. **先查当前用户能用什么**（项目里已配好 MCP 服务 `zleap-app`，见 `.mcp.json`；没登录时 MCP 工具会报未登录，请用户先 `npm run login`）：
+   - 当前会话没有加载 MCP 工具时，用等价的命令行（都在项目目录运行）：`npx zleap-app business search --query 待办`、
+     `npx zleap-app business get --operation "GET /api/v1/todos"`、`npx zleap-app business call --operation "POST /api/v1/todos" --input-file in.json --dry-run`
+     （`in.json` 按 `business get` 返回的 `input_schema` 写，形如 `{"query": {...}}` / `{"body": {...}}`）；
    - `os_business_search(query)`：按需求搜索当前账号有权限的 OS 接口（待办、文件、日程、项目、AI 生成文字、定时任务……），中文、英文关键词各搜一次。**先看返回的 `page_api.enabled`**：`false` 表示这个部署没开放页面 API，页面里 `api.fetch` 一律失败，改用 SDK 能力、集合或云函数，并告诉用户；
    - `os_business_get(operation)`：读契约和页面写法 `page_call`（`page_unavailable` 非空表示页面不能直接调，结果里给替代方案）。操作键是「方法 + 完整路径」，如 `POST /api/v1/agents/complete`，写错时报错里会给出可能的键；字段的取值和单位看 Schema 里的 `description`（如待办 `status` 只有 todo / done，OS 接口的时间是**秒级**时间戳，而 `Date.now()` 和云数据库是毫秒）；
    - `os_business_call(operation, input)`：用用户自己的账号试调。读接口直接调；**写 / 删接口先传 `dry_run: true`**（只校验参数、预览请求，不写数据），真正调用会改用户的真实数据，要调就先告诉用户、试完删掉；

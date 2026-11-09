@@ -488,8 +488,10 @@ Manifest 校验器接受 `^[a-zA-Z][a-zA-Z0-9_.-]*$`（≤128），但**数据�
 规则是一个布尔表达式，决定某条文档能否被读/写，例如 `doc.status == 'open'`。
 
 - 操作数：`doc.<字段>`、`auth.uid`、`auth.openid`、`now`、数字、单引号字符串、`true`/`false`/`null`；
-- `auth.openid` 是调用者在**本应用数据域**里的身份，等于他写入的文档上的 `_openid`（例如 `doc._openid == auth.openid`
-  表示「只能读写自己的记录」）。它和页面里 `zl.auth.getIdentity()` 拿到的 `openid` **不是同一个值**，不要拿后者去比较或写进规则；
+- `auth.openid` 是调用者在**本应用数据域**里的身份，等于他写入的文档上的 `_openid`。它和页面里 `zl.auth.getIdentity()`
+  拿到的 `openid` **不是同一个值**，不要拿后者去比较或写进规则；
+- 规则里**不能引用 `_openid`** 等系统字段（`doc._openid` 会以 `RULE_DENIED` 被拒）：规则只能引用 Schema 里声明的顶层字段，
+  而字段名必须以字母开头。要表达「只有创建者能改」，见下方示例；
 - 运算：`==`、`!=`、`<`、`<=`、`>`、`>=`、`&&`、`||`、`!`、括号；
 - 最多 64 个节点、8 层嵌套；
 - 不能两边都是字面量；与 `true`/`false`/`null` 比较时另一边必须是 `doc.<字段>`；
@@ -497,6 +499,48 @@ Manifest 校验器接受 `^[a-zA-Z][a-zA-Z0-9_.-]*$`（≤128），但**数据�
   （否则报 `RULE_FIELD_UNDECLARED`）。
 
 表达式写错时 Manifest 被拒，原因 `RULE_DENIED`（「集合规则表达式无效」）。
+
+**什么时候求值**：
+
+| 操作 | `write` 规则作用在 | 不满足时 |
+| ---- | ------------------ | -------- |
+| `add` | 新文档 | `RULE_DENIED`（40300），不写入 |
+| `update` / `set` | 修改前的文档**和**修改后的文档 | 修改前不满足：按看不到处理（`DOCUMENT_NOT_FOUND`）；修改后不满足：`RULE_DENIED` |
+| `remove` | 删除前的文档 | 按看不到处理（`DOCUMENT_NOT_FOUND`） |
+
+`read` 规则同样作用在查询、计数、`doc().get()` 上，不满足的文档对调用者不可见。控制台（应用发布者）不受记录规则限制。
+
+**示例：共享集合「所有人可读，只有创建者能改 / 删」**
+
+```json
+"data": {
+  "collections": ["board"],
+  "schemas": {
+    "board": {
+      "type": "object",
+      "properties": {
+        "author": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 500 }
+      },
+      "required": ["author", "text"]
+    }
+  },
+  "policies": { "board": { "partition": "shared", "write": "doc.author == auth.openid" } }
+}
+```
+
+页面写入时把自己在本数据域的身份填进 `author`。SDK 没有单独返回它的接口，取法是读回一条**自己写的**文档的 `_openid`
+（私有集合里任意一条都行，同一环境内私有、共享集合的 `_openid` 相同），取到后缓存：
+
+```js
+const me = db.collection('profile'); // 任意私有集合
+const { _id } = await me.add({ data: { created_at: new Date() } });
+const { data } = await me.doc(_id).get();
+const myId = data._openid; // 写 board 时用作 author
+await db.collection('board').add({ data: { author: myId, text: '大家好' } });
+```
+
+`author` 写别人的值会被 `RULE_DENIED` 拒绝；别人的帖子对你 `update` / `remove` 时按看不到处理。
 
 ## `background` — 后台模式
 
