@@ -267,3 +267,23 @@ test('不用云资源的应用：部署结束不提示开发环境与数据库',
   assert.equal(result.status, 0, result.stderr + result.stdout);
   assert.doesNotMatch(result.stdout, /开发环境|数据库/);
 });
+
+test('平台 appid 应用：同版本同内容已发布为线上版本，直接复用不改版本号（成员拉同一份代码 deploy）', () => {
+  const { dir, deploy, state } = project(
+    { packages: [{ app_key: 'zl0123456789abcdef', version: '1.0.0', digest: '1.0.0-v1', visibility: 'enterprise', version_id: 400 }] },
+    'zl0123456789abcdef',
+  );
+  const result = deploy();
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')).version, '1.0.0');
+  assert.doesNotMatch(result.stdout + result.stderr, /自动递增/);
+  assert.ok(!state().packages.some((row) => row.version === '1.0.1'));
+});
+
+test('旧命名空间应用：同内容版本已公开发布，自动递增补丁号并说明原因', () => {
+  const { dir, deploy } = project({ packages: [{ app_key: 'com.acme.todo', version: '1.0.0', digest: '1.0.0-v1', visibility: 'enterprise', version_id: 400 }] });
+  const result = deploy();
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')).version, '1.0.1');
+  assert.match(result.stdout + result.stderr, /已公开发布/);
+});

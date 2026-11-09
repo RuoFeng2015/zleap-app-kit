@@ -220,12 +220,17 @@ async function deploy() {
   ok(`检查通过：${report.app_key} v${report.version}（${report.files} 个文件，runtime_test=${report.runtime_test}）`);
 
   // 同一版本号只能对应一份内容；内容变了就自动递增补丁号（构建型项目要重新构建，所以在这里做）。
+  // 同内容：平台 appid 应用即使这个版本已发布为线上版本，平台也直接复用（同事拉同一份代码 deploy 装上同一版本）；
+  // 只有旧命名空间 app_key 的已公开版本不能再作为开发版本上传，才需要换版本号。
   const existing = publishedVersions().find((row) => row.app_key === report.app_key && row.version === report.version);
-  if (existing && (stripDigest(existing.digest) !== stripDigest(report.digest) || !['private', 'members'].includes(existing.visibility))) {
-    if (project.build && has('no-build')) throw new StepError(`版本 ${report.version} 已上传过不同内容，请修改 version 后重新构建`);
+  const changed = existing && stripDigest(existing.digest) !== stripDigest(report.digest);
+  const legacyPublished = existing && !/^zl[0-9a-f]{16}$/.test(report.app_key) && !['private', 'members'].includes(existing.visibility);
+  if (changed || legacyPublished) {
+    const why = changed ? '已上传过不同内容' : '已公开发布（旧命名空间应用的开发版本需要新版本号）';
+    if (project.build && has('no-build')) throw new StepError(`版本 ${report.version} ${why}，请修改 version 后重新构建`);
     const current = manifest();
     const next = bumpPatch(current.version);
-    warn(`版本 ${current.version} 已上传过不同内容，自动递增为 ${next}`);
+    warn(`版本 ${current.version} ${why}，自动递增为 ${next}`);
     writeJSON(manifestFile, { ...current, version: next });
     build();
     report = checkDist();
