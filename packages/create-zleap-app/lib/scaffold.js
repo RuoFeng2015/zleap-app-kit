@@ -152,6 +152,15 @@ export function detectPackageManager(userAgent = process.env.npm_config_user_age
   return 'npm';
 }
 
+/**
+ * 「接下来」里运行项目脚本的命令。一律带 run：`pnpm deploy`、`pnpm login`、`yarn login` 是包管理器自己的内置命令
+ * （工作区部署 / 登录 npm 仓库），不会执行项目里的 deploy、login 脚本。npm 需要 `--` 才把参数交给脚本，其余直接跟在后面。
+ */
+export function runScriptCommand(pm, script, args = '') {
+  if (pm === 'npm') return `npm run ${script}${args ? ` -- ${args}` : ''}`;
+  return `${pm} run ${script}${args ? ` ${args}` : ''}`;
+}
+
 export function isEmptyDir(dir) {
   if (!existsSync(dir)) return true;
   if (!statSync(dir).isDirectory()) return false;

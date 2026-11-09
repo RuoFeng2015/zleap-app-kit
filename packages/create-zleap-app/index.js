@@ -17,6 +17,7 @@ import {
   TEMPLATES,
   detectPackageManager,
   installSkills,
+  runScriptCommand,
   isEmptyDir,
   nodeVersionProblem,
   parseArgs,
@@ -161,20 +162,20 @@ async function main() {
     }
 
     const cd = relative(process.cwd(), targetDir) || '.';
-    const runScript = (script) => (pm === 'npm' ? `npm run ${script}` : `${pm} ${script}`);
+
     console.log(`
 ${bold('完成！接下来：')}
 
   cd ${cd}${installed ? '' : `\n  ${pm} install`}
-  ${runScript('login')}${options.target ? '' : ' -- --target https://你的-os-地址'}   ${dim(appid ? '# 浏览器授权' : '# 浏览器授权，同时新建应用')}
-  ${runScript('deploy')}                                         ${dim(BUILD_TEMPLATES.includes(options.template) ? '# 构建→检查→上传→装到你的桌面' : '# 检查→上传→装到你的桌面（不用构建）')}
+  ${runScriptCommand(pm, 'login', options.target ? '' : '--target https://你的-os-地址')}   ${dim(appid ? '# 浏览器授权' : '# 浏览器授权，同时新建应用')}
+  ${runScriptCommand(pm, 'deploy')}                                         ${dim(BUILD_TEMPLATES.includes(options.template) ? '# 构建→检查→上传→装到你的桌面' : '# 检查→上传→装到你的桌面（不用构建）')}
 
   然后从 zleapOS 启动台打开应用（开发环境与数据库在安装时自动开通）。
 
 ${bold('让 AI 编程工具帮你开发')}
-  项目里已带 AGENTS.md、skills 和 MCP 配置（.mcp.json、.cursor/mcp.json），直接在 Claude Code / Cursor / Codex / OpenCode 里打开本目录即可。
+  ${options.skills ? '项目里已带 AGENTS.md、skills 和 MCP 配置' : '项目里已带 AGENTS.md 和 MCP 配置（按 --no-skills 没有安装 skills）'}（.mcp.json、.cursor/mcp.json），直接在 Claude Code / Cursor / Codex / OpenCode 里打开本目录即可。
   AI 会先通过 MCP 查清你账号下可用的 OS 接口与 SDK，没有的再用云函数补充。
-  已有项目补装 skills：${cyan('npx create-zleap-app@latest skills')}
+  ${options.skills ? '已有项目补装' : '需要时补装'} skills：${cyan('npx create-zleap-app@latest skills')}
 `);
   } finally {
     rl?.close();

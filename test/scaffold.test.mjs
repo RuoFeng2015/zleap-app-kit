@@ -12,6 +12,7 @@ import {
   isEmptyDir,
   nodeVersionProblem,
   parseArgs,
+  runScriptCommand,
   scaffold,
   toAppKeySegment,
   toPackageName,
@@ -185,4 +186,29 @@ test('appid 可留空，两个模板都带 MCP 配置（不写死部署地址）
   }
   assert.equal(validateOptionalAppId(''), null);
   assert.notEqual(validateOptionalAppId('bad'), null);
+});
+
+test('runScriptCommand：非 npm 一律带 run，避免撞上 pnpm deploy / pnpm login / yarn login 内置命令', () => {
+  assert.equal(runScriptCommand('npm', 'deploy'), 'npm run deploy');
+  assert.equal(runScriptCommand('npm', 'login', '--target https://os.example.com'), 'npm run login -- --target https://os.example.com');
+  for (const pm of ['pnpm', 'yarn', 'bun']) {
+    assert.equal(runScriptCommand(pm, 'deploy'), `${pm} run deploy`);
+    assert.equal(runScriptCommand(pm, 'login', '--target https://os.example.com'), `${pm} run login --target https://os.example.com`);
+  }
+});
+
+test('完成提示：--pm pnpm 给出可执行的脚本命令；--no-skills 不再声称已带 skills', () => {
+  const cli = join(root, 'packages/create-zleap-app/index.js');
+  const cwd = mkdtempSync(join(tmpdir(), 'czapp-hint-'));
+  const pnpm = spawnSync(process.execPath, [cli, 'p', '--pm', 'pnpm', '--no-install', '--no-git', '-y'], { cwd, encoding: 'utf8' });
+  assert.equal(pnpm.status, 0, pnpm.stderr);
+  assert.match(pnpm.stdout, /pnpm run login --target /);
+  assert.match(pnpm.stdout, /pnpm run deploy/);
+  assert.doesNotMatch(pnpm.stdout, /pnpm (login|deploy)\b/);
+  assert.match(pnpm.stdout, /已带 AGENTS\.md、skills/);
+  const bare = spawnSync(process.execPath, [cli, 'q', '--no-install', '--no-git', '--no-skills', '-y'], { cwd, encoding: 'utf8' });
+  assert.equal(bare.status, 0, bare.stderr);
+  assert.ok(!existsSync(join(cwd, 'q/.agents/skills')));
+  assert.doesNotMatch(bare.stdout, /已带 AGENTS\.md、skills/);
+  assert.match(bare.stdout, /没有安装 skills/);
 });
