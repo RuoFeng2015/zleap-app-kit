@@ -1,6 +1,6 @@
 {
   "name": "@zleap-ai/app-cli-linux-x64",
-  "version": "0.12.4",
+  "version": "0.12.5",
   "description": "zleap-app 预编译二进制（linux x64），由 @zleap-ai/app-cli 自动选用",
   "license": "MIT",
   "repository": {
@@ -18,8 +18,8 @@
   ],
   "preferUnplugged": true,
   "zleapApp": {
-    "commit": "d5ba085f",
-    "sha256": "0f0057d0e910e52f1c52aa353f03ec52afbebfed16e37a5e4c77104cc36376a8",
-    "source": "26e388761050a8400bebb526a32d9ee987d7ffdfef01064584c4ddda48b1945c"
+    "commit": "bf07ced3",
+    "sha256": "aa2434fdf9aba690c360e0a7c5e561df088166246eafcef96c71aeaea6dbbb32",
+    "source": "633911b8d9214e1e2d41ae870d6dcd588da2033bd0efed6adfd4d6d5626c2d48"
   }
 }

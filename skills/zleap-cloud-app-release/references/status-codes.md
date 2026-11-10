@@ -72,13 +72,13 @@
 
 宿主按下面的白名单把 `reason` 原样转给应用：
 
-| 分组       | 原样透传的码                                                                                                                                                                             |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 认证与权限 | `AUTH_REQUIRED`、`ENV_FORBIDDEN`、`PUBLISHER_REQUIRED`、`SCOPE_FORBIDDEN`、`RULE_DENIED`、`QUERY_NOT_AUTHORIZED`                                                                         |
-| 数据       | `COLLECTION_NOT_FOUND`、`DOCUMENT_NOT_FOUND`、`SCHEMA_INVALID`、`UNSUPPORTED_OPERATION`、`VERSION_CONFLICT`、`IDEMPOTENCY_CONFLICT`、`INDEX_REQUIRED`                                    |
-| 繁忙与超限 | `RESOURCE_EXHAUSTED`、`APP_RATE_LIMITED`                                                                                                                                                 |
-| 结果与通道 | `RUNTIME_UNAVAILABLE`、`CALL_TIMEOUT`、`COMMIT_UNKNOWN`、`NODE_LOST`、`NODE_LOST_EXPIRED`、`OPERATION_EXPIRED`、`STALE_GENERATION`、`PROTOCOL_MISMATCH`                                  |
-| 文件       | `STALE_RESOURCE`、`FILE_NOT_FOUND`、`STORAGE_UNAVAILABLE`                                                                                                                                |
+| 分组       | 原样透传的码                                                                                                                                                                                                                                                                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 认证与权限 | `AUTH_REQUIRED`、`ENV_FORBIDDEN`、`PUBLISHER_REQUIRED`、`SCOPE_FORBIDDEN`、`RULE_DENIED`、`QUERY_NOT_AUTHORIZED`                                                                                                                                                                                                                                     |
+| 数据       | `COLLECTION_NOT_FOUND`、`DOCUMENT_NOT_FOUND`、`SCHEMA_INVALID`、`UNSUPPORTED_OPERATION`、`VERSION_CONFLICT`、`IDEMPOTENCY_CONFLICT`、`INDEX_REQUIRED`                                                                                                                                                                                                |
+| 繁忙与超限 | `RESOURCE_EXHAUSTED`、`APP_RATE_LIMITED`                                                                                                                                                                                                                                                                                                             |
+| 结果与通道 | `RUNTIME_UNAVAILABLE`、`CALL_TIMEOUT`、`COMMIT_UNKNOWN`、`NODE_LOST`、`NODE_LOST_EXPIRED`、`OPERATION_EXPIRED`、`STALE_GENERATION`、`PROTOCOL_MISMATCH`                                                                                                                                                                                              |
+| 文件       | `STALE_RESOURCE`、`FILE_NOT_FOUND`、`STORAGE_UNAVAILABLE`                                                                                                                                                                                                                                                                                            |
 | 就绪与发布 | `RESOURCE_NOT_READY`、`FUNCTION_RELEASE_REQUIRED`、`RELEASE_UNAVAILABLE`、`RELEASE_NOT_READY`、`RELEASE_DISABLED`、`RELEASE_ACTIVATION_UNAVAILABLE`、`RELEASE_ACTIVATION_TARGET_MISSING`、`ACTIVATION_STALE`、`ACTIVATION_RELEASE_MISMATCH`、`CAPABILITY_REVOKED`、`CAPABILITY_NOT_DECLARED`、`CAPABILITY_NOT_AUTHORIZED`、`MAINTENANCE_IN_PROGRESS` |
 
 不在白名单里的码按业务码段位归类：
@@ -157,11 +157,11 @@
 
 ### 文件存储
 
-| 错误码                | 含义                      | 处理                               |
-| --------------------- | ------------------------- | ---------------------------------- |
-| `FILE_NOT_FOUND`      | 文件不存在或已删除        | 检查 `fileID`                      |
-| `STALE_RESOURCE`      | 条件覆盖/删除时文件已变化 | 重新 `stat` 拿到最新 etag 后再操作 |
-| `STORAGE_UNAVAILABLE` | 存储服务不可用            | 稍后重试                           |
+| 错误码                    | 含义                              | 处理                                               |
+| ------------------------- | --------------------------------- | -------------------------------------------------- |
+| `FILE_NOT_FOUND`          | 文件不存在或已删除                | 检查 `fileID`                                      |
+| `STALE_RESOURCE`          | 条件覆盖/删除时文件已变化         | 重新 `stat` 拿到最新 etag 后再操作                 |
+| `STORAGE_UNAVAILABLE`     | 存储服务不可用                    | 稍后重试                                           |
 | `MAINTENANCE_IN_PROGRESS` | 数据正在备份 / 恢复，暂时冻结读写 | 提示用户「数据维护中」，稍后重试；不要当成数据丢失 |
 
 ### 发布与后台调用
@@ -174,9 +174,9 @@
 | `RELEASE_DISABLED`                  | 发布候选已撤回                                     | 重新上传并发布                                                                                                                                                                                |
 | `RELEASE_ACTIVATION_UNAVAILABLE`    | 目标环境不存在且无法自动创建                       | 通常是部署未开放对应环境；请联系平台管理员                                                                                                                                                    |
 | `ACTIVATION_STALE`                  | 后台能力的授权停用了，或固定的版本 / 环境已变化    | 在应用窗口「权限」里重新允许该后台能力                                                                                                                                                        |
-| `ACTIVATION_RELEASE_MISMATCH`       | 后台能力绑定的发布与安装当前的发布不一致           | 在应用窗口「权限」里重新保存一次，平台会把各环境的后台能力改绑到当前发布                                                                                                                       |
+| `ACTIVATION_RELEASE_MISMATCH`       | 后台能力绑定的发布与安装当前的发布不一致           | 在应用窗口「权限」里重新保存一次，平台会把各环境的后台能力改绑到当前发布                                                                                                                      |
 | `CAPABILITY_REVOKED`                | 后台能力的授权已被撤销                             | 在应用窗口「权限」里重新允许                                                                                                                                                                  |
-| `CAPABILITY_NOT_DECLARED`           | 当前版本的 manifest 已不再声明这个后台能力         | 检查 `runtime.capabilities.provides`；如果是有意去掉，应用里不要再调用它                                                                                                                       |
+| `CAPABILITY_NOT_DECLARED`           | 当前版本的 manifest 已不再声明这个后台能力         | 检查 `runtime.capabilities.provides`；如果是有意去掉，应用里不要再调用它                                                                                                                      |
 | `CAPABILITY_NOT_AUTHORIZED`         | 用户还没有允许这个后台能力                         | 引导用户在应用窗口「权限」里勾选后台运行                                                                                                                                                      |
 | `RELEASE_ACTIVATION_TARGET_MISSING` | 激活目标与校验后的 Manifest 不一致（少见）         | 重新上传并安装该版本                                                                                                                                                                          |
 | `NODE_LOST`                         | 执行节点失联，**结果未确认**（作业状态 `unknown`） | 不要重复提交；用 `jobId` / `invocationId` 核对                                                                                                                                                |
@@ -436,17 +436,17 @@
 
 上传、`zleap-app check` 或安装时，Manifest 相关失败通过 `detail.reason` 返回：
 
-| 原因                                                                                  | 含义                                                                                                   | 处理                                                           |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| `MANIFEST_UNSUPPORTED`                                                                | `schema` 不是 `zleap.app/2`、结构/引用/执行形态无效                                                    | 对照 Manifest（文档站 ./manifest） 逐字段核对                         |
-| `SCHEMA_INVALID`                                                                      | 集合 Schema 不符合数据面契约（`detail.collection` 指出集合）                                           | 只用集合 Schema 子集                                           |
-| `RULE_DENIED`                                                                         | 集合记录规则表达式无效                                                                                 | 修正表达式                                                     |
-| `RULE_FIELD_UNDECLARED`                                                               | 记录规则引用了 Schema 未声明的字段                                                                     | 在 Schema 顶层声明该字段                                       |
-| `RUNTIME_UNAVAILABLE`                                                                 | 运行环境未开放（`builtin` UI、纯后台带函数等）                                                         | 见 不可安装的配置（文档站 ./limits#已知会导致「应用不可安装」的配置） |
-| `FEATURE_UNAVAILABLE`                                                                 | 声明了未开放的能力或写法                                                                               | 同上                                                           |
-| `VERSION_EXISTS`                                                                      | 同版本号、内容不同（40900）                                                                            | 改 `version`；`npm run deploy` 自动递增补丁号                  |
+| 原因                                                                                  | 含义                                                                                                   | 处理                                                                                                   |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `MANIFEST_UNSUPPORTED`                                                                | `schema` 不是 `zleap.app/2`、结构/引用/执行形态无效                                                    | 对照 Manifest（文档站 ./manifest） 逐字段核对                                                                 |
+| `SCHEMA_INVALID`                                                                      | 集合 Schema 不符合数据面契约（`detail.collection` 指出集合）                                           | 只用集合 Schema 子集                                                                                   |
+| `RULE_DENIED`                                                                         | 集合记录规则表达式无效                                                                                 | 修正表达式                                                                                             |
+| `RULE_FIELD_UNDECLARED`                                                               | 记录规则引用了 Schema 未声明的字段                                                                     | 在 Schema 顶层声明该字段                                                                               |
+| `RUNTIME_UNAVAILABLE`                                                                 | 运行环境未开放（`builtin` UI、纯后台带函数等）                                                         | 见 不可安装的配置（文档站 ./limits#已知会导致「应用不可安装」的配置）                                         |
+| `FEATURE_UNAVAILABLE`                                                                 | 声明了未开放的能力或写法                                                                               | 同上                                                                                                   |
+| `VERSION_EXISTS`                                                                      | 同版本号、内容不同（40900）                                                                            | 改 `version`；`npm run deploy` 自动递增补丁号                                                          |
 | `VERSION_NOT_INCREASING`                                                              | 平台 appid 应用的新版本号不高于已上传的版本（40900，`detail.latest_version` 给出最高版本）             | 把 `version` 改成更高的号；`npm run deploy` 自动处理（旧项目先 `npx create-zleap-app@latest scripts`） |
-| `TRIGGER_SCHEDULE_INVALID` / `TRIGGER_CAPABILITY_NOT_PROVIDED` / `EVENT_NOT_DECLARED` | 触发器的 cron / 时区无效、调用的能力不在 `provides` 里、监听的事件不在 `events.subscribes` 里（42200） | 按 `next_action` 修正触发器声明                                |
+| `TRIGGER_SCHEDULE_INVALID` / `TRIGGER_CAPABILITY_NOT_PROVIDED` / `EVENT_NOT_DECLARED` | 触发器的 cron / 时区无效、调用的能力不在 `provides` 里、监听的事件不在 `events.subscribes` 里（42200） | 按 `next_action` 修正触发器声明                                                                        |
 
 常见的上传失败文案（没有原因码，直接看提示）：
 
