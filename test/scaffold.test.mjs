@@ -232,11 +232,12 @@ test('包管理器配置：yarn 用 node_modules 布局、pnpm 放行 esbuild �
 });
 
 test('updateScripts 给已有项目更新部署脚本并备份原文件', async () => {
-  const { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } = await import('node:fs');
+  const { mkdtempSync, readFileSync, writeFileSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { updateScripts } = await import('../packages/create-zleap-app/lib/scaffold.js');
-  const sharedDir = new URL('../packages/create-zleap-app/templates/_shared', import.meta.url).pathname;
+  // fileURLToPath 而不是 URL.pathname：Windows 上 pathname 是 /D:/… ，不是合法路径（CI windows-latest 失败）。
+  const sharedDir = fileURLToPath(new URL('../packages/create-zleap-app/templates/_shared', import.meta.url));
   const dir = mkdtempSync(join(tmpdir(), 'zleap-scripts-'));
   assert.equal(updateScripts({ sharedDir, targetDir: dir }), 'created');
   assert.equal(updateScripts({ sharedDir, targetDir: dir }), 'unchanged');
@@ -245,5 +246,4 @@ test('updateScripts 给已有项目更新部署脚本并备份原文件', async 
   assert.equal(readFileSync(join(dir, 'scripts', 'zleap.mjs.bak'), 'utf8'), '// old\n');
   assert.equal(readFileSync(join(dir, 'scripts', 'zleap.mjs'), 'utf8'), readFileSync(join(sharedDir, 'scripts', 'zleap.mjs'), 'utf8'));
   assert.ok(existsSync(join(dir, 'scripts', 'zleap.mjs.bak')));
-  mkdirSync(join(dir, 'x'));
 });
