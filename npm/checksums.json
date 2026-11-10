@@ -1,30 +1,30 @@
 {
   "darwin": {
     "file": "bin/zleap-app",
-    "sha256": "dcf6d07e25ce4156ed59bd3895ba24b21392688e4d63fa25f986aee7cceee99e",
-    "commit": "75e0c915",
-    "source": "1d81b345b60bc235d7a8c41bc60299d49abe639d39a1f429989be02a3b204ba1",
-    "sdk": "593b98bd6d4f1600d48579da161460f6e38403fd35164621668a31dfeecab21f"
+    "sha256": "99a30fd32a3c0a6986cec7f13c3d8f6aa0d540b4a6e1282c03d434733f0a0c9a",
+    "commit": "a34605ca",
+    "source": "fe159f30d4f3bb9fea8b8497d3ade6d7ba35e4dfdf5f56e6a1761d80c467e8d0",
+    "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
   },
   "linux-x64": {
     "file": "bin/zleap-app",
-    "sha256": "383ed903a467ad3be14db52059851770a92c7f2f08654549798fcf67eeaa4841",
-    "commit": "75e0c915",
-    "source": "1d81b345b60bc235d7a8c41bc60299d49abe639d39a1f429989be02a3b204ba1",
-    "sdk": "593b98bd6d4f1600d48579da161460f6e38403fd35164621668a31dfeecab21f"
+    "sha256": "24c5f1a7b6a31ff06505dae02876444c07392763c2cc755be6bb281cda076b99",
+    "commit": "a34605ca",
+    "source": "fe159f30d4f3bb9fea8b8497d3ade6d7ba35e4dfdf5f56e6a1761d80c467e8d0",
+    "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
   },
   "linux-arm64": {
     "file": "bin/zleap-app",
-    "sha256": "2ebd6ff6d1f0fa35f5b5aa634a9fc3c3abcd5b0089629b52b622ba93ce5d24e0",
-    "commit": "75e0c915",
-    "source": "1d81b345b60bc235d7a8c41bc60299d49abe639d39a1f429989be02a3b204ba1",
-    "sdk": "593b98bd6d4f1600d48579da161460f6e38403fd35164621668a31dfeecab21f"
+    "sha256": "7c695be6ea29f80dc31d3934d445484e36f4bfebf6ab4d106664adbaf6499fa5",
+    "commit": "a34605ca",
+    "source": "fe159f30d4f3bb9fea8b8497d3ade6d7ba35e4dfdf5f56e6a1761d80c467e8d0",
+    "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
   },
   "win32-x64": {
     "file": "bin/zleap-app.exe",
-    "sha256": "595190d1d319c1468a67d0933760dbdeaafaa7b19959aa539f4d904e3dcfea72",
-    "commit": "75e0c915",
-    "source": "1d81b345b60bc235d7a8c41bc60299d49abe639d39a1f429989be02a3b204ba1",
-    "sdk": "593b98bd6d4f1600d48579da161460f6e38403fd35164621668a31dfeecab21f"
+    "sha256": "5ac0798ddbfe3ea9188a89d7f1423ad2a2873f5ec4206a4c7ac90521d5e4a728",
+    "commit": "a34605ca",
+    "source": "fe159f30d4f3bb9fea8b8497d3ade6d7ba35e4dfdf5f56e6a1761d80c467e8d0",
+    "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
   }
 }
