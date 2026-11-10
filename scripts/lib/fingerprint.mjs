@@ -6,8 +6,19 @@ import { join, relative, sep } from 'node:path';
 
 import { config, sdkSourceDir } from './config.mjs';
 
-/** build-cli 的编译参数。改了它二进制就变，所以也算进 CLI 指纹。 */
-export const GO_BUILD_ARGS = ['build', '-trimpath', '-ldflags=-s -w'];
+/**
+ * build-cli 的编译参数。改了它二进制就变，所以也算进 CLI 指纹（指纹用带 {cliVersion} 占位的模板，不随版本号变）。
+ * 版本号由 kit.config.json 的 cliVersion 注入：Go 源码里的 appdevcli.Version 只是默认值，发布脚本升版本时不会去改它，
+ * 不注入的话 npm 上 0.12.1 的二进制 `zleap-app version` / MCP serverInfo 仍报 0.12.0（全流程测试 e11-11091657-998）。
+ * 不注入 Commit：npm 构建与服务端镜像的提交号不同，注入会让 `zleap-app version` 一直误报需要升级。
+ */
+export const GO_BUILD_ARGS = ['build', '-trimpath', '-ldflags=-s -w -X zleap-os-go/internal/appdevcli.Version={cliVersion}'];
+
+/** 实际编译参数：把 cliVersion 填进 ldflags。 */
+export function goBuildArgs(cliVersion) {
+  if (!/^\d+\.\d+\.\d+$/.test(cliVersion ?? '')) throw new Error(`cliVersion 无效：${cliVersion}`);
+  return GO_BUILD_ARGS.map((arg) => arg.replace('{cliVersion}', cliVersion));
+}
 
 /**
  * zleap-app 的源码指纹：所有平台下 ./cmd/zleap-app 依赖到的本仓库包（源文件 + embed 文件）、第三方模块版本、Go 版本、编译参数。

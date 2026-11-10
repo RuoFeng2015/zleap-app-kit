@@ -13,7 +13,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { join, resolve } from 'node:path';
 
 import { arg, config, paths, platformDir, platformPackageName, platformSuffix, sdkSourceDigest, sdkSourceDir } from './lib/config.mjs';
-import { cliSourceDigest, GO_BUILD_ARGS } from './lib/fingerprint.mjs';
+import { cliSourceDigest, goBuildArgs } from './lib/fingerprint.mjs';
 
 const source = resolve(arg('source', join(paths.root, '..', 'zleap-service')));
 const go = arg('go', 'go');
@@ -69,7 +69,7 @@ for (const platform of selected) {
   process.stdout.write(`构建 ${platformSuffix(platform)}（${platform.goos}/${platform.goarch.join('+')}）… `);
   const slices = platform.goarch.map((goarch) => (platform.goarch.length > 1 ? `${output}-${goarch}` : output));
   platform.goarch.forEach((goarch, i) => {
-    execFileSync(go, [...GO_BUILD_ARGS, '-o', slices[i], './cmd/zleap-app'], {
+    execFileSync(go, [...goBuildArgs(config.cliVersion), '-o', slices[i], './cmd/zleap-app'], {
       cwd: source,
       stdio: ['ignore', 'inherit', 'inherit'],
       env: { ...process.env, CGO_ENABLED: '0', GOOS: platform.goos, GOARCH: goarch, GOFLAGS: '-buildvcs=false' },
