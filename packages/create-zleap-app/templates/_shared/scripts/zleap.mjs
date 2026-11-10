@@ -122,13 +122,18 @@ function bumpPatch(version) {
   return `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
 }
 
-/** 比较 x.y.z（只比较数字核心；预发布后缀不参与）。无法解析时返回 0（不提示）。 */
+/** 比较 x.y.z（与平台一致：数字核心相同时，带预发布后缀的低于正式版；两个预发布之间按字符串）。无法解析时返回 0。 */
 function compareVersion(a, b) {
   const pa = /^(\d+)\.(\d+)\.(\d+)/.exec(a);
   const pb = /^(\d+)\.(\d+)\.(\d+)/.exec(b);
   if (!pa || !pb) return 0;
   for (let i = 1; i <= 3; i += 1) if (Number(pa[i]) !== Number(pb[i])) return Number(pa[i]) - Number(pb[i]);
-  return 0;
+  const ra = /^[^-+]*-([^+]*)/.exec(a)?.[1] ?? '';
+  const rb = /^[^-+]*-([^+]*)/.exec(b)?.[1] ?? '';
+  if (ra === rb) return 0;
+  if (!ra) return 1;
+  if (!rb) return -1;
+  return ra < rb ? -1 : 1;
 }
 
 const stripDigest = (value) => String(value ?? '').replace(/^sha256:/, '');
@@ -231,22 +236,26 @@ async function deploy() {
   // 同一版本号只能对应一份内容；内容变了就自动递增补丁号（构建型项目要重新构建，所以在这里做）。
   // 同内容：平台 appid 应用即使这个版本已发布为线上版本，平台也直接复用（同事拉同一份代码 deploy 装上同一版本）；
   // 只有旧命名空间 app_key 的已公开版本不能再作为开发版本上传，才需要换版本号。
-  const uploaded = publishedVersions();
-  const existing = uploaded.find((row) => row.app_key === report.app_key && row.version === report.version);
-  // 与微信小程序一致：版本号是给成员看的标签，上传不要求递增（开发版本只装到你自己）。
-  // 但低于线上版本时提醒一句：之后把它「发布为线上版本」等于回退，使用者会切到这个更低的版本号。
-  const live = uploaded.find((row) => row.app_key === report.app_key && row.visibility === 'enterprise' && compareVersion(row.version, report.version) > 0);
-  if (live && !existing) {
-    warn(`版本 ${report.version} 低于线上版本 ${live.version}：上传后只装到你自己；发布它等于回退。需要上线新功能请把 manifest.json 的 version 改成高于 ${live.version}`);
-  }
+  // 平台 appid 应用的新版本号必须高于已上传的全部版本（平台拒绝更低的号，VERSION_NOT_INCREASING）：
+  // 不高于时自动改成「最高版本 + 1 个补丁号」。zleap-app status 列出全部成员上传的版本。
+  const uploaded = publishedVersions().filter((row) => row.app_key === report.app_key);
+  const existing = uploaded.find((row) => row.version === report.version);
+  const platform = /^zl[0-9a-f]{16}$/.test(report.app_key);
   const changed = existing && stripDigest(existing.digest) !== stripDigest(report.digest);
-  const legacyPublished = existing && !/^zl[0-9a-f]{16}$/.test(report.app_key) && !['private', 'members'].includes(existing.visibility);
-  if (changed || legacyPublished) {
-    const why = changed ? '已上传过不同内容' : '已公开发布（旧命名空间应用的开发版本需要新版本号）';
+  const legacyPublished = existing && !platform && !['private', 'members'].includes(existing.visibility);
+  const highest = uploaded.reduce((top, row) => (top === null || compareVersion(row.version, top) > 0 ? row.version : top), null);
+  const notHigher = platform && !existing && highest !== null && compareVersion(report.version, highest) <= 0;
+  if (changed || legacyPublished || notHigher) {
+    const why = notHigher
+      ? `不高于已上传的版本 ${highest}（新版本号必须更高）`
+      : changed
+        ? '已上传过不同内容'
+        : '已公开发布（旧命名空间应用的开发版本需要新版本号）';
     if (project.build && has('no-build')) throw new StepError(`版本 ${report.version} ${why}，请修改 version 后重新构建`);
     const current = manifest();
-    const next = bumpPatch(current.version);
-    warn(`版本 ${current.version} ${why}，自动递增为 ${next}`);
+    let next = bumpPatch(current.version);
+    if (platform && highest !== null && compareVersion(next, highest) <= 0) next = bumpPatch(highest);
+    warn(`版本 ${current.version} ${why}，自动改为 ${next}`);
     writeJSON(manifestFile, { ...current, version: next });
     build();
     report = checkDist();

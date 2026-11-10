@@ -288,24 +288,29 @@ test('旧命名空间应用：同内容版本已公开发布，自动递增补�
   assert.match(result.stdout + result.stderr, /已公开发布/);
 });
 
-test('版本号低于线上版本：照常上传（与微信小程序一致不强制递增），但提示发布等于回退', () => {
+test('平台 appid 应用：版本号不高于已上传版本时自动改为最高版本 + 1（平台拒绝更低的版本号）', () => {
   const { dir, deploy, state } = project(
-    { packages: [{ app_key: 'zl0123456789abcdef', version: '2.0.0', digest: '2.0.0-v1', visibility: 'enterprise', version_id: 400 }] },
+    {
+      packages: [
+        { app_key: 'zl0123456789abcdef', version: '2.0.0', digest: '2.0.0-v1', visibility: 'enterprise', version_id: 400 },
+        { app_key: 'zl0123456789abcdef', version: '2.3.1', digest: '2.3.1-v1', visibility: 'members', version_id: 401 },
+      ],
+    },
     'zl0123456789abcdef',
   );
   const result = deploy();
   assert.equal(result.status, 0, result.stderr + result.stdout);
-  assert.match(result.stdout + result.stderr, /低于线上版本 2\.0\.0/);
-  assert.equal(JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')).version, '1.0.0');
-  assert.ok(state().packages.some((row) => row.version === '1.0.0'));
+  assert.match(result.stdout + result.stderr, /不高于已上传的版本 2\.3\.1/);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')).version, '2.3.2');
+  assert.ok(state().packages.some((row) => row.version === '2.3.2'));
 });
 
-test('版本号高于线上版本：不提示', () => {
+test('版本号高于已上传版本：不改版本号', () => {
   const { deploy } = project(
     { packages: [{ app_key: 'zl0123456789abcdef', version: '0.9.0', digest: '0.9.0-v1', visibility: 'enterprise', version_id: 400 }] },
     'zl0123456789abcdef',
   );
   const result = deploy();
   assert.equal(result.status, 0, result.stderr + result.stdout);
-  assert.doesNotMatch(result.stdout + result.stderr, /低于线上版本/);
+  assert.doesNotMatch(result.stdout + result.stderr, /不高于已上传的版本|自动改为/);
 });
