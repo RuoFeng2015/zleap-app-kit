@@ -69,7 +69,7 @@ ZIP 根目录还必须有 `index.html`（入口）和**非空的 `LICENSE` 文�
 | `schema`        | ✅   | 字符串 | 固定为 `"zleap.app/2"`，其他值会直接被拒绝                          |
 | `appid`         | ✅   | 字符串 | 应用唯一标识，在云开发控制台「创建应用」后由平台生成，见下方说明    |
 | `name`          | ✅   | 字符串 | 显示名，1–128 位，**必须有可见字符**                                |
-| `version`       | ✅   | 字符串 | 语义化版本（SemVer），≤32 位，如 `1.0.0`、`1.2.0-beta.1`            |
+| `version`       | ✅   | 字符串 | 语义化版本（SemVer），≤32 位，如 `1.0.0`、`1.2.0-beta.1`；不要求递增，见版本号规则（文档站 /console/release#版本号规则） |
 | `description`   |      | 字符串 | ≤2000 位                                                            |
 | `icon`          |      | 字符串 | ≤512 位                                                             |
 | `execution`     | ✅   | 枚举   | `foreground` / `headless` / `both`，必须与 `runtime` 一致           |
