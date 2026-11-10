@@ -4,6 +4,7 @@
 //   npm create zleap-app@latest my-app
 //   npx create-zleap-app my-app --appid zl3f9a2c7e1b0d4a68 --name "我的应用" -y
 //   npx create-zleap-app@latest skills [目录]      给已有项目补装 AI 编程工具 skills
+//   npx create-zleap-app@latest scripts [目录]     给已有项目更新部署脚本 scripts/zleap.mjs
 //
 // appid 由平台生成：先在 zleapOS 云开发控制台「创建应用」，复制 appid。
 import { spawnSync } from 'node:child_process';
@@ -23,6 +24,7 @@ import {
   nodeVersionProblem,
   parseArgs,
   scaffold,
+  updateScripts,
   toPackageName,
   validateName,
   validateOptionalAppId,
@@ -46,6 +48,7 @@ ${bold('create-zleap-app')} ${dim(`v${pkg.version}`)} — 创建 zleapOS 云开�
   npm create zleap-app@latest [目录] [-- 选项]
   npx create-zleap-app [目录] [选项]
   npx create-zleap-app@latest skills [目录]   给已有项目补装 AI 编程工具 skills（默认当前目录）
+  npx create-zleap-app@latest scripts [目录]  给已有项目更新部署脚本 scripts/zleap.mjs（npm run deploy 等），原文件备份为 .bak
 
 选项
   --appid <appid>   已有应用的 appid（形如 zl3f9a2c7e1b0d4a68）；不填时第一次 npm run login 会在授权时自动新建应用
@@ -85,12 +88,26 @@ function addSkills(dir) {
   console.log(dim('  在 Codex / Claude Code / Pi / OpenCode / Cursor 里打开这个目录即可使用；升级 skills 时重新运行本命令。'));
 }
 
+/** 已有项目更新 scripts/zleap.mjs：只动这一个文件，原文件不同则备份为 .bak。 */
+function refreshScripts(dir) {
+  const targetDir = resolve(dir ?? '.');
+  if (!existsSync(join(targetDir, 'package.json'))) throw new Error(`${targetDir} 不是项目目录（没有 package.json）`);
+  const result = updateScripts({ sharedDir: join(here, 'templates', '_shared'), targetDir });
+  const label = { created: '已生成', updated: '已更新（原文件备份为 scripts/zleap.mjs.bak）', unchanged: '已是最新，无需更新' }[result];
+  console.log(green(`✔ scripts/zleap.mjs ${label}（create-zleap-app v${pkg.version}）`));
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   if (argv[0] === 'skills') {
     const rest = parseArgs(argv.slice(1));
     if (rest.help) return console.log(HELP);
     return addSkills(rest.dir);
+  }
+  if (argv[0] === 'scripts') {
+    const rest = parseArgs(argv.slice(1));
+    if (rest.help) return console.log(HELP);
+    return refreshScripts(rest.dir);
   }
   const options = parseArgs(argv);
   if (options.help) return console.log(HELP);

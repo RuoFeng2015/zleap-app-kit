@@ -232,3 +232,24 @@ export function installSkills({ skillsDir, targetDir }) {
   }
   return names;
 }
+
+/**
+ * 给已有项目更新部署脚本 scripts/zleap.mjs（来自 templates/_shared）。脚本里没有占位符，直接覆盖；
+ * 原文件不同时先备份为 scripts/zleap.mjs.bak。返回 'created' | 'updated' | 'unchanged'。
+ * 版本号规则等改进只随新项目分发，已有项目原来只能手工复制（全流程测试 e11-11091657-998）。
+ */
+export function updateScripts({ sharedDir, targetDir }) {
+  const from = join(sharedDir, 'scripts', 'zleap.mjs');
+  const to = join(targetDir, 'scripts', 'zleap.mjs');
+  const next = readFileSync(from, 'utf8');
+  if (!existsSync(to)) {
+    mkdirSync(dirname(to), { recursive: true });
+    writeFileSync(to, next);
+    return 'created';
+  }
+  const current = readFileSync(to, 'utf8');
+  if (current === next) return 'unchanged';
+  writeFileSync(`${to}.bak`, current);
+  writeFileSync(to, next);
+  return 'updated';
+}

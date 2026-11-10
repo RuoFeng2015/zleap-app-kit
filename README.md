@@ -36,6 +36,7 @@ npm run deploy           # 构建 → 平台检查 → 上传开发版本（appi
 
 ```bash
 npx create-zleap-app@latest skills [项目目录]                  # 从 npm 包复制到 .agents/skills 与 .claude/skills（推荐，离线可用）
+npx create-zleap-app@latest scripts [项目目录]                 # 更新已有项目的部署脚本 scripts/zleap.mjs（原文件备份为 .bak）
 # 也可以用 skills CLI 从 GitHub 安装 / 全局安装：
 npx skills add RuoFeng2015/zleap-app-kit
 npx skills add RuoFeng2015/zleap-app-kit -g -a codex -a claude-code -a pi -a opencode -y

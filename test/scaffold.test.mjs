@@ -230,3 +230,20 @@ test('包管理器配置：yarn 用 node_modules 布局、pnpm 放行 esbuild �
   assert.ok(existsSync(join(cwd, 'pnpm/pnpm-workspace.yaml')));
   assert.ok(!existsSync(join(cwd, 'npm/.yarnrc.yml')) && !existsSync(join(cwd, 'npm/pnpm-workspace.yaml')));
 });
+
+test('updateScripts 给已有项目更新部署脚本并备份原文件', async () => {
+  const { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { updateScripts } = await import('../packages/create-zleap-app/lib/scaffold.js');
+  const sharedDir = new URL('../packages/create-zleap-app/templates/_shared', import.meta.url).pathname;
+  const dir = mkdtempSync(join(tmpdir(), 'zleap-scripts-'));
+  assert.equal(updateScripts({ sharedDir, targetDir: dir }), 'created');
+  assert.equal(updateScripts({ sharedDir, targetDir: dir }), 'unchanged');
+  writeFileSync(join(dir, 'scripts', 'zleap.mjs'), '// old\n');
+  assert.equal(updateScripts({ sharedDir, targetDir: dir }), 'updated');
+  assert.equal(readFileSync(join(dir, 'scripts', 'zleap.mjs.bak'), 'utf8'), '// old\n');
+  assert.equal(readFileSync(join(dir, 'scripts', 'zleap.mjs'), 'utf8'), readFileSync(join(sharedDir, 'scripts', 'zleap.mjs'), 'utf8'));
+  assert.ok(existsSync(join(dir, 'scripts', 'zleap.mjs.bak')));
+  mkdirSync(join(dir, 'x'));
+});
