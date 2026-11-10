@@ -1,30 +1,30 @@
 {
   "darwin": {
     "file": "bin/zleap-app",
-    "sha256": "99a30fd32a3c0a6986cec7f13c3d8f6aa0d540b4a6e1282c03d434733f0a0c9a",
-    "commit": "a34605ca",
-    "source": "fe159f30d4f3bb9fea8b8497d3ade6d7ba35e4dfdf5f56e6a1761d80c467e8d0",
+    "sha256": "98d3870a913e1c57e1bba67de7ebf58f5935d5516670e9ff10113496e0a52f5b",
+    "commit": "eccc5efd",
+    "source": "2436bcdaf0a0ae6c69b322b88c1e16d2037c33e48e2d6b04dd8e2773a345d15a",
     "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
   },
   "linux-x64": {
     "file": "bin/zleap-app",
-    "sha256": "24c5f1a7b6a31ff06505dae02876444c07392763c2cc755be6bb281cda076b99",
-    "commit": "a34605ca",
-    "source": "fe159f30d4f3bb9fea8b8497d3ade6d7ba35e4dfdf5f56e6a1761d80c467e8d0",
+    "sha256": "6ecbbca934ab68379140844043616d79506e94282450c491036a94ff3475a968",
+    "commit": "eccc5efd",
+    "source": "2436bcdaf0a0ae6c69b322b88c1e16d2037c33e48e2d6b04dd8e2773a345d15a",
     "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
   },
   "linux-arm64": {
     "file": "bin/zleap-app",
-    "sha256": "7c695be6ea29f80dc31d3934d445484e36f4bfebf6ab4d106664adbaf6499fa5",
-    "commit": "a34605ca",
-    "source": "fe159f30d4f3bb9fea8b8497d3ade6d7ba35e4dfdf5f56e6a1761d80c467e8d0",
+    "sha256": "43632a7e73d0966f52eb34947283d35756ece87759efc409eb1237e3f8a0d847",
+    "commit": "eccc5efd",
+    "source": "2436bcdaf0a0ae6c69b322b88c1e16d2037c33e48e2d6b04dd8e2773a345d15a",
     "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
   },
   "win32-x64": {
     "file": "bin/zleap-app.exe",
-    "sha256": "5ac0798ddbfe3ea9188a89d7f1423ad2a2873f5ec4206a4c7ac90521d5e4a728",
-    "commit": "a34605ca",
-    "source": "fe159f30d4f3bb9fea8b8497d3ade6d7ba35e4dfdf5f56e6a1761d80c467e8d0",
+    "sha256": "e39647afbb0441e1eeba29986669d66461ab313dfcb75a6b4748b7cb31b37e22",
+    "commit": "eccc5efd",
+    "source": "2436bcdaf0a0ae6c69b322b88c1e16d2037c33e48e2d6b04dd8e2773a345d15a",
     "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@zleap-ai/app-cli",
-  "version": "0.12.1",
+  "version": "0.12.3",
   "description": "zleapOS 云开发命令行工具 zleap-app（init / check / pack / publish / install / prepare / test / MCP），按平台自动选用预编译二进制",
   "license": "MIT",
   "repository": {
@@ -22,10 +22,10 @@
     "node": ">=18"
   },
   "optionalDependencies": {
-    "@zleap-ai/app-cli-darwin": "0.12.1",
-    "@zleap-ai/app-cli-linux-x64": "0.12.1",
-    "@zleap-ai/app-cli-linux-arm64": "0.12.1",
-    "@zleap-ai/app-cli-win32-x64": "0.12.1"
+    "@zleap-ai/app-cli-darwin": "0.12.3",
+    "@zleap-ai/app-cli-linux-x64": "0.12.3",
+    "@zleap-ai/app-cli-linux-arm64": "0.12.3",
+    "@zleap-ai/app-cli-win32-x64": "0.12.3"
   },
   "keywords": [
     "zleap",

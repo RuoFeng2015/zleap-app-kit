@@ -5,13 +5,13 @@
   },
   "metadata": {
     "description": "zleapOS 云开发应用的开发与上线 skills",
-    "version": "0.12.1"
+    "version": "0.12.3"
   },
   "plugins": [
     {
       "name": "zleap-app-kit",
       "description": "开发、调试、部署与上线 zleapOS 云开发（App Cloud）应用",
-      "version": "0.12.1",
+      "version": "0.12.3",
       "source": "./",
       "strict": false,
       "skills": [
