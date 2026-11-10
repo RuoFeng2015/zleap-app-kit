@@ -3,6 +3,9 @@
 //
 //   node scripts/build-sdk.mjs --source ../zleap-service           # 构建到 packages/app-sdk/dist
 //   node scripts/build-sdk.mjs --source ../zleap-service --check   # 只校验 dist 是否由当前源码构建
+//   node scripts/build-sdk.mjs --source ../zleap-service --embed   # 另外把混淆产物写进 zleap-service 的
+//       internal/appdevcli/sdkdist/：zleap-app 二进制内嵌它（init hosted-package 写进项目、MCP app_sdk_get 返回），
+//       不再内嵌可读源码。SDK 源码改动后要重新运行并提交 sdkdist，zleap-service 的 TestEmbeddedSDKIsBuiltFromSource 会检查。
 //
 // 可读源码只存在于私有仓库，本仓库（公开）只提交包壳；dist/ 不入库，发布前在本地构建。
 // 混淆范围：去注释、压缩、改写局部与模块内标识符。属性名不改——它们是与宿主之间的消息协议和数据字段。
@@ -17,6 +20,7 @@ const source = resolve(arg('source', join(paths.root, '..', 'zleap-service')));
 const from = sdkSourceDir(source);
 const dist = join(paths.sdk, 'dist');
 const check = flag('check');
+const embed = flag('embed');
 
 /** 包入口 → 源文件。三个入口彼此独立（宿主 SDK 与工作区模块本身零 import）。 */
 export const ENTRIES = { index: 'index.js', host: 'zleap-sdk.js', workspace: 'workspace.js' };
@@ -115,3 +119,16 @@ console.log(
     .map((out) => `${out}.js ${(outputs[out].bytes / 1024).toFixed(1)}KB`)
     .join('，')}（源码 ${(inputBytes / 1024).toFixed(1)}KB → ${(outputBytes / 1024).toFixed(1)}KB）`,
 );
+
+// --embed：CLI 内嵌的公开 SDK = 与 npm 相同的混淆产物。宿主 SDK 在 CLI 项目里沿用历史文件名 zleap-sdk.js。
+if (embed) {
+  const target = join(source, 'internal', 'appdevcli', 'sdkdist');
+  rmSync(target, { recursive: true, force: true });
+  mkdirSync(target, { recursive: true });
+  const names = { index: 'index.js', host: 'zleap-sdk.js', workspace: 'workspace.js' };
+  for (const [out, name] of Object.entries(names)) copyFileSync(join(dist, `${out}.js`), join(target, name));
+  for (const name of sourceFiles.filter((file) => file.endsWith('.d.ts'))) copyFileSync(join(from, name), join(target, name));
+  copyFileSync(join(from, STYLE), join(target, STYLE));
+  writeFileSync(join(target, 'build-info.json'), `${JSON.stringify({ package: config.sdkPackage, version: config.sdkVersion, source: digest, files: names }, null, 2)}\n`);
+  console.log(`已写入 CLI 内嵌 SDK：${target}`);
+}

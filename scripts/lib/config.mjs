@@ -33,9 +33,10 @@ export function readJSON(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
-/** SDK 事实源目录（CLI 内嵌的公开 SDK）。build-sdk 打包它，CLI 二进制也把它编进去。 */
+/** SDK 可读源码目录（私有仓库 zleap-service）。build-sdk 把它打包混淆成 npm 产物，并用 --embed 写进
+ * internal/appdevcli/sdkdist 供 CLI 内嵌；可读源码本身不再编进 CLI 二进制。 */
 export function sdkSourceDir(source) {
-  return join(source, 'internal', 'appdevcli', 'templates', 'todo', 'sdk');
+  return join(source, 'internal', 'appdevcli', 'sdksrc');
 }
 
 /** SDK 源码指纹：build-sdk 记进 dist/build-info.json，build-cli 记进 checksums.json，发布时用来比较两者是否同一份。 */

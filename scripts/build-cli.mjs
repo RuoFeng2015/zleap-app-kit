@@ -49,6 +49,15 @@ try {
 }
 // CLI 二进制内嵌了一份 SDK（MCP 的 SDK 参考、原生模板）：记下指纹，发布 SDK 时提示两者是否同一份。
 const sdk = sdkSourceDigest(sdkSourceDir(source)).digest;
+// CLI 内嵌的是 sdkdist（混淆产物），必须由当前 sdksrc 构建；否则二进制里的 SDK 与 npm 包对不上。
+{
+  const info = join(source, 'internal', 'appdevcli', 'sdkdist', 'build-info.json');
+  const embedded = existsSync(info) ? JSON.parse(readFileSync(info, 'utf8')).source : '';
+  if (embedded !== sdk) {
+    console.error('zleap-service/internal/appdevcli/sdkdist 不是由当前 SDK 源码构建的：先运行 node scripts/build-sdk.mjs --source <zleap-service> --embed 并提交。');
+    process.exit(1);
+  }
+}
 // CLI 源码指纹写进平台包的 package.json（zleapApp.source），release 拿它和 npm 上的版本比，判断 CLI 要不要发版。
 const cliSource = cliSourceDigest(source, go);
 

@@ -455,9 +455,10 @@ async function main() {
   writeVersions(versions);
   node('sync.mjs');
   const releasing = new Set(lines.filter((line) => line.release).map((line) => line.id));
-  if (releasing.has('sdk')) {
+  if (releasing.has('sdk') || releasing.has('cli')) {
+    // CLI 二进制内嵌混淆后的 SDK（sdkdist），发 CLI 时也要先刷新它；sdkdist 有变化要提交到 zleap-service。
     if (!existsSync(join(paths.root, 'node_modules', 'esbuild'))) execFileSync(npmBin, ['install'], { cwd: paths.root, stdio: 'inherit', shell: win });
-    node('build-sdk.mjs', '--source', source);
+    node('build-sdk.mjs', '--source', source, '--embed');
   }
   if (releasing.has('cli')) node('build-cli.mjs', '--source', source);
 

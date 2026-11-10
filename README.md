@@ -67,7 +67,7 @@ test/                           node:test：脚手架、二进制解析、部署
 | 内容 | 事实源 | 同步命令 | CI 校验 |
 | --- | --- | --- | --- |
 | `zleap-app` 二进制 | `zleap-service/cmd/zleap-app` | `npm run build:cli -- --source ../zleap-service` | 发布前核对 checksums |
-| `@zleap-ai/app-sdk` 产物 | `zleap-service/internal/appdevcli/templates/todo/sdk`（CLI 内嵌的公开 SDK） | `npm run build:sdk -- --source ../zleap-service`（esbuild 打包、压缩、改写局部标识符；属性名不动；禁止 eval） | `--check`（发布前自动执行） |
+| `@zleap-ai/app-sdk` 产物 | `zleap-service/internal/appdevcli/sdksrc`（可读源码，只在私有仓库） | `npm run build:sdk -- --source ../zleap-service --embed`（esbuild 打包、压缩、改写局部标识符；属性名不动；禁止 eval；`--embed` 同时把混淆产物写进 `zleap-service/internal/appdevcli/sdkdist` 供 CLI 内嵌，需在 zleap-service 提交） | `--check`（发布前自动执行） |
 | skills `references/` | 云开发文档站 `zleap-web/apps/docs` | `npm run sync:refs -- --docs ../zleap-web/apps/docs` | `--check` |
 | 包名 / 版本 / 随附 skills | `kit.config.json`、`skills/` | `npm run sync` | `npm run check` |
 

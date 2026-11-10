@@ -2,7 +2,7 @@
 // 把 zleapOS 平台设计 token 同步进应用官方样式 zleap.css 的 tokens 段，保证外部应用与桌面同色。
 //
 //   node scripts/sync-style-tokens.mjs --tokens ../zleap-web/packages/ui/src/styles/tokens.generated.css \
-//        --css ../zleap-service/internal/appdevcli/templates/todo/sdk/zleap.css            # 写入
+//        --css ../zleap-service/internal/appdevcli/sdksrc/zleap.css            # 写入
 //   …同上… --check                                                                           # 只校验，不一致时退出码 1
 //
 // 只取应用需要的语义 token（颜色、阴影、圆角、字号），primitive 变量（--p-*）解析成具体值，应用里不依赖平台私有变量名。
