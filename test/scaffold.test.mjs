@@ -217,6 +217,8 @@ test('完成提示：--pm pnpm 给出可执行的脚本命令；--no-skills 不�
 test('包管理器配置：yarn 用 node_modules 布局、pnpm 放行 esbuild 构建脚本，npm 不写；已有文件不覆盖', () => {
   assert.deepEqual(packageManagerFiles('npm'), {});
   assert.match(packageManagerFiles('yarn')['.yarnrc.yml'], /^nodeLinker: node-modules$/m);
+  // yarn 4 默认隔离发布不满 24 小时的版本：本项目自己的包要放行，否则发布当天新建的项目装不上
+  assert.match(packageManagerFiles('yarn')['.yarnrc.yml'], /^npmPreapprovedPackages:\n  - "@zleap-ai\/\*"$/m);
   assert.match(packageManagerFiles('pnpm')['pnpm-workspace.yaml'], /allowBuilds:\n  esbuild: true/);
   const cli = join(root, 'packages/create-zleap-app/index.js');
   const cwd = mkdtempSync(join(tmpdir(), 'czapp-pm-'));
@@ -224,7 +226,7 @@ test('包管理器配置：yarn 用 node_modules 布局、pnpm 放行 esbuild �
     const r = spawnSync(process.execPath, [cli, pm, '--pm', pm, '--no-install', '--no-git', '--no-skills', '-y'], { cwd, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
   }
-  assert.equal(readFileSync(join(cwd, 'yarn/.yarnrc.yml'), 'utf8'), 'nodeLinker: node-modules\n');
+  assert.equal(readFileSync(join(cwd, 'yarn/.yarnrc.yml'), 'utf8'), packageManagerFiles('yarn')['.yarnrc.yml']);
   assert.ok(existsSync(join(cwd, 'pnpm/pnpm-workspace.yaml')));
   assert.ok(!existsSync(join(cwd, 'npm/.yarnrc.yml')) && !existsSync(join(cwd, 'npm/pnpm-workspace.yaml')));
 });

@@ -157,10 +157,15 @@ export function detectPackageManager(userAgent = process.env.npm_config_user_age
  * - yarn 4 默认 Plug'n'Play，没有 node_modules/.bin：scripts/zleap.mjs 与 .mcp.json 里的 npx zleap-app 都找不到 CLI；
  * - pnpm 10 起默认拦截依赖的构建脚本，pnpm 12 的 install 因此以非 0 退出（Vite 依赖的 esbuild 需要 postinstall），
  *   新版用 allowBuilds，旧版（10/11）用 onlyBuiltDependencies，两个都写。
+ * - yarn 4.10 起默认 npmMinimalAgeGate=1440：发布不满 24 小时的版本一律「quarantined」装不上，
+ *   每次发布 @zleap-ai/* 后一天内新建的 yarn 项目都会安装失败（e11-1109a 实测 yarn 4.18.1）。
+ *   只放行本项目自己的包，第三方依赖仍受年龄闸保护。
  * 全流程测试 e6-11091657-468 PKG-07。
  */
+const YARNRC = 'nodeLinker: node-modules\nnpmPreapprovedPackages:\n  - "@zleap-ai/*"\n  - create-zleap-app\n';
+
 export function packageManagerFiles(pm) {
-  if (pm === 'yarn') return { '.yarnrc.yml': 'nodeLinker: node-modules\n' };
+  if (pm === 'yarn') return { '.yarnrc.yml': YARNRC };
   if (pm === 'pnpm') return { 'pnpm-workspace.yaml': 'allowBuilds:\n  esbuild: true\nonlyBuiltDependencies:\n  - esbuild\n' };
   return {};
 }
