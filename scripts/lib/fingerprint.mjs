@@ -22,7 +22,8 @@ export function goBuildArgs(cliVersion) {
 
 /**
  * zleap-app 的源码指纹：所有平台下 ./cmd/zleap-app 依赖到的本仓库包（源文件 + embed 文件）、第三方模块版本、Go 版本、编译参数。
- * 刻意排除内嵌的 SDK 目录：SDK 自己一条版本线，只改 SDK 不触发 CLI 发版（CLI 里那份 SDK 参考下次 CLI 发版时跟上）。
+ * 排除 SDK 可读源码目录 sdksrc（不编进二进制）；内嵌的混淆产物 sdkdist 计入指纹——SDK 改动经 build-sdk --embed
+ * 刷新 sdkdist 后，CLI 也随之发版，保证二进制里的 SDK 与 npm 上的 @zleap-ai/app-sdk 一致。
  */
 export function cliSourceDigest(source, go = 'go') {
   const sdkDir = sdkSourceDir(source);
