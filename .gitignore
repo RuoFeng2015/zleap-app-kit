@@ -4,3 +4,6 @@ npm/*/bin
 .DS_Store
 .tmp
 packages/app-sdk/dist
+
+# Claude Code 子代理临时工作树，不入库
+.claude/worktrees/
