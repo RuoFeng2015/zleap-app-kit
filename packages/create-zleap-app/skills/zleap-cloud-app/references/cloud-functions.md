@@ -278,7 +278,12 @@ await zl.cloud.os.database.mutate({
 ```
 
 可用参数：`collection`、`operation`、`document_key`（`add` 以外必填）、`data`、`value_types`、`field_operations`、
-`expected_version`（`add` 不接受）、`operation_id`、`request_id`（必填）。`remove` 不接受 `data`。
+`expected_version`（`add` 不接受）、`operation_id`（必填，格式见[操作编号](#操作编号)）、`request_id`（必填）。`remove` 不接受 `data`。
+
+> **写操作必须带 `operation_id`**（危险）
+>
+> `mutate` 的 `add` / `set` / `update` / `remove` 都必须带合法的 `operation_id`，缺了或格式不对会被网关拒绝（`GATEWAY_OPERATION_ID_INVALID`）；
+> 函数里没捕获的话，整次调用以 `USER_EXCEPTION` 失败（定时触发器每次都会失败）。用下面[操作编号](#操作编号)里的 `operationIdFor(context, 用途)` 生成。
 
 返回值形如 `{ operation_id, stats, document: { _id, _version } }`：`document._id` 是新文档（`add`）或被写文档的键，
 `document._version` 是写入后的版本号，下次 `update` / `remove` 时作为 `expected_version` 传回去。
@@ -288,6 +293,7 @@ const saved = await zl.cloud.os.database.mutate({
   collection: 'drafts',
   operation: 'add',
   data,
+  operation_id: operationIdFor(context, 'add'),
   request_id: `${context.invocationId}:add`,
 });
 return { id: saved.document._id, version: saved.document._version };
