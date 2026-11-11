@@ -21,6 +21,13 @@
     "publish:direct": "node scripts/publish.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.25.12"
+    "@npmcli/agent": "2.2.2",
+    "@npmcli/config": "8.3.4",
+    "esbuild": "0.25.12",
+    "npm-profile": "10.0.0",
+    "npm-registry-fetch": "17.1.0"
+  },
+  "overrides": {
+    "encoding": "0.1.13"
   }
 }

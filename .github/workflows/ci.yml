@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: npm ci --ignore-scripts
       - name: 包名、版本与随附 skills 一致
         run: npm run check
       - name: 单元与流程测试

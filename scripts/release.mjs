@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一键发布：和 npm 上的 latest 比 → 只发真正变了的包 → 自动定版本 → 构建、测试 → 暂存发布（不要 2FA）→ 一次授权批准全部。
+// 一键发布：和 npm 上的 latest 比 → 只发真正变了的包 → 自动定版本 → 构建、测试 → 暂存发布（不要 2FA）→ 批次共享授权批准。
 //
 //   npm run release                    # 打印发布计划，确认后执行
 //   npm run release -- --dry-run       # 只检测、打印计划，不改任何文件
@@ -9,16 +9,17 @@
 //   --refs                             # 文档站有新改动时同步进 skills（配合 --yes；交互模式会问）
 //   --source ../zleap-service --docs ../zleap-web/apps/docs   # 事实源位置（默认同级目录）
 //
-// 为什么能「一次授权」：npm 12 的 `npm stage publish` 上传时不要 2FA，只有批准（approve）要。
+// 为什么使用批次授权：npm 12 的 `npm stage publish` 上传时不要 2FA，只有批准（approve）要。
 // 所以先把所有包上传进暂存区（慢的部分），再连续批准（每个只是一次很小的请求）：
-//   · 2FA 用验证器 App：输一次 6 位码，所有包都用它批准；过期了再问一次。
-//   · 2FA 用安全密钥 / 浏览器验证：浏览器验证一次，拿到的凭据先给后面的包复用；npm 不收时再开一次浏览器。
+//   · 2FA 验证结果仅在批次内存中复用，服务端可能要求重新验证。
+//   · 仅 EOTP 重新验证（最多 3 次）；其他错误停止，不逐包降级。
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { ApprovalError, approveBatch, createApprovalClient, loadApprovalOptions } from './lib/release-approve.mjs';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { arg, config, flag, paths, platformDir, platformPackageName, readJSON, sdkSourceDigest, sdkSourceDir } from './lib/config.mjs';
@@ -209,10 +210,8 @@ function npm12(args, options = {}) {
   return spawnSync(npxBin, [...NPM12, ...args], { encoding: 'utf8', shell: win, ...options });
 }
 
-function stagedItems() {
-  const result = npm12(['stage', 'list', '--json'], { cwd: tmp });
-  if (result.status !== 0) throw new ReleaseError(`读取暂存区失败：\n${result.stderr}`);
-  return JSON.parse(result.stdout || '[]');
+async function stagedItems() {
+  return (await client()).stagedItems();
 }
 
 function localShasum(dir) {
@@ -220,7 +219,7 @@ function localShasum(dir) {
   return JSON.parse(result.stdout)[0].shasum;
 }
 
-function stage(target, existing) {
+async function stage(target, existing) {
   const found = existing.find((item) => item.packageName === target.name && item.version === target.version);
   if (found) {
     if (found.shasum !== localShasum(target.dir)) {
@@ -233,130 +232,54 @@ function stage(target, existing) {
     return found.id;
   }
   const result = npm12(['stage', 'publish', '--access', 'public', '--tag', 'latest'], { cwd: target.dir, stdio: ['inherit', 'pipe', 'inherit'] });
-  const id = result.stdout?.match(/staged with id ([0-9a-f-]{36})/i)?.[1] ?? stagedItems().find((item) => item.packageName === target.name && item.version === target.version)?.id;
+  const id = result.stdout?.match(/staged with id ([0-9a-f-]{36})/i)?.[1] ?? (await stagedItems()).find((item) => item.packageName === target.name && item.version === target.version)?.id;
   if (result.status !== 0 || !id) throw new ReleaseError(`${target.name}@${target.version} 上传暂存区失败：\n${result.stdout ?? ''}`);
   console.log(`  ${green('✔')} ${target.name}@${target.version} 已上传暂存区`);
   return id;
 }
 
-function registryAuth() {
-  const registry = npm(['config', 'get', 'registry']).stdout.trim().replace(/\/?$/, '/') || 'https://registry.npmjs.org/';
-  const { host, pathname } = new URL(registry);
-  const key = `//${host}${pathname}:_authToken`;
-  for (const file of [join(paths.root, '.npmrc'), npm(['config', 'get', 'userconfig']).stdout.trim()]) {
-    if (!file || !existsSync(file)) continue;
-    for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
-      const match = line.match(/^\s*([^=\s]+)\s*=\s*(.*?)\s*$/);
-      if (match?.[1] === key) {
-        const token = match[2].replace(/^["']|["']$/g, '').replace(/\$\{([^}]+)\}/g, (_, name) => process.env[name] ?? '');
-        return { registry, token };
-      }
-    }
-  }
-  return { registry, token: '' };
+let approvalClient;
+async function client() {
+  approvalClient ??= createApprovalClient(await loadApprovalOptions({ cwd: paths.root }));
+  return approvalClient;
 }
 
-function openBrowser(url) {
-  const [cmd, args] = win ? ['cmd', ['/c', 'start', '""', url]] : [process.platform === 'darwin' ? 'open' : 'xdg-open', [url]];
-  spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
-}
-
-/**
- * 和 npm 自己发的请求头保持一致（npm-registry-fetch）：批准请求与轮询验证结果用同一组头，
- * registry 按它们把浏览器验证和这次请求对应起来，只带 token 轮询会被拒（403）。
- */
-function npmHeaders(token) {
-  const version = npm12(['--version'], { cwd: tmp }).stdout?.trim() || '12.0.0';
-  return {
-    'user-agent': `npm/${version} node/${process.version} ${process.platform} ${process.arch} workspaces/false`,
-    'npm-auth-type': 'web',
-    'npm-command': 'stage',
-    'npm-session': randomBytes(8).toString('hex'),
-    authorization: `Bearer ${token}`,
-  };
-}
-
-/** 浏览器验证（安全密钥 / 浏览器里的 2FA）：打开 authUrl，轮询 doneUrl 拿一次性凭据。与 npm 自己的流程相同。 */
-async function webAuth({ authUrl, doneUrl }, headers) {
-  console.log(`\n  在浏览器里完成 npm 验证（已尝试自动打开）：\n  ${authUrl}`);
-  openBrowser(authUrl);
-  const deadline = Date.now() + 5 * 60_000;
-  while (Date.now() < deadline) {
-    const res = await fetch(doneUrl, { headers, cache: 'no-store' });
-    if (res.status === 200) {
-      const body = await res.json();
-      if (body.token) return body.token;
-    } else if (res.status !== 202) {
-      throw new ReleaseError(`浏览器验证结果读取失败：HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
-    }
-    await sleep(Math.max(1, Number(res.headers.get('retry-after')) || 1) * 1000);
-  }
-  throw new ReleaseError('浏览器验证超时（5 分钟）');
-}
-
-/** 交给 npm 自己批准（它的浏览器验证一定可用）：每个包各验证一次，作为兜底。 */
-function approveWithNpm(items) {
-  for (const item of items) {
-    console.log(`  · ${item.name}@${item.version}：npm stage approve ${item.id}`);
-    const result = spawnSync(npxBin, [...NPM12, 'stage', 'approve', item.id], { stdio: 'inherit', shell: win, cwd: tmp });
-    if (result.status !== 0) {
-      throw new ReleaseError(`${item.name}@${item.version} 批准失败。也可以在 npmjs.com 头像 → Packages →「Staged Packages」里点 Approve。`);
-    }
-    console.log(`  ${green('✔')} ${item.name}@${item.version} 已批准上线`);
-  }
+async function openBrowser(url) {
+  // No shell interpolation (especially cmd.exe on Windows).
+  const [cmd, args] = win ? ['rundll32.exe', ['url.dll,FileProtocolHandler', url]] : [process.platform === 'darwin' ? 'open' : 'xdg-open', [url]];
+  await new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { stdio: 'ignore', shell: false });
+    child.once('error', reject);
+    child.once('exit', (code) => code === 0 ? resolve() : reject(new ApprovalError('无法打开验证浏览器')));
+  });
 }
 
 async function approveAll(staged) {
-  // 刚上传的包 registry 要先校验（status: validating），校验完才能批准。
-  for (let i = 0; i < 60; i++) {
-    const validating = stagedItems().filter((item) => staged.some((own) => own.id === item.id) && item.status === 'validating');
-    if (validating.length === 0) break;
-    if (i === 0) console.log(dim(`  等 registry 校验完：${validating.map((item) => item.packageName).join('、')}`));
-    await sleep(5000);
-  }
-  const { registry, token } = registryAuth();
-  // 凭据不在 .npmrc（例如来自环境变量）：只能交给 npm 自己批准。
-  if (!token) return approveWithNpm(staged);
-  const headers = npmHeaders(token);
-  let otp = '';
-  for (const [index, item] of staged.entries()) {
-    try {
-      for (let attempt = 0; ; attempt++) {
-        const res = await fetch(new URL(`-/stage/${item.id}/approve`, registry), {
-          method: 'POST',
-          headers: { ...headers, ...(otp ? { 'npm-otp': otp } : {}) },
-        });
-        if (res.ok) {
-          console.log(`  ${green('✔')} ${item.name}@${item.version} 已批准上线`);
-          break;
-        }
-        const text = await res.text();
-        const needsOtp = res.status === 401 && (/otp/i.test(res.headers.get('www-authenticate') ?? '') || /one-time pass/i.test(text));
-        if (!needsOtp || attempt >= 3) {
-          throw new ReleaseError(`${item.name}@${item.version} 批准失败：HTTP ${res.status} ${text.slice(0, 300)}`);
-        }
-        let body = {};
-        try {
-          body = JSON.parse(text);
-        } catch {
-          // 纯文本错误：按验证码处理
-        }
-        otp = body.authUrl && body.doneUrl ? await webAuth(body, headers) : await ask(`\n  ${otp ? '验证码已过期，' : ''}输入验证器 App 里的 npm 6 位验证码：`);
-      }
-    } catch (error) {
-      if (!(error instanceof ReleaseError)) throw error;
-      console.log(`\n  ${red('!')} ${error.message}\n  改由 npm 自己批准剩下的 ${staged.length - index} 个包（每个包各验证一次）：`);
-      return approveWithNpm(staged.slice(index));
-    }
-  }
+  const api = await client();
+  return approveBatch(staged, { client: api, dryRun, log: console.log,
+    authenticate: (error) => api.authenticate(error, {
+      openBrowser,
+      promptOtp: async () => {
+        if (!process.stdin.isTTY) throw new ApprovalError('验证码需要交互终端');
+        rl?.close(); rl = undefined;
+        process.stdout.write('输入 npm 6 位验证码（隐藏输入）：');
+        const input = createInterface({ input: process.stdin, output: new Writable({ write(chunk, encoding, done) { done(); } }), terminal: true });
+        try { return (await input.question('')).trim(); }
+        finally { input.close(); process.stdout.write('\n'); }
+      },
+    }),
+  });
 }
 
 /** 续跑：只批准暂存区里本仓库的包，按依赖顺序。 */
 async function approveStaged() {
   const order = [...config.platforms.map(platformPackageName), config.cliPackage, config.sdkPackage, config.createPackage];
-  const staged = stagedItems()
-    .filter((item) => order.includes(item.packageName))
-    .filter((item) => !published(item.packageName, item.version))
+  const candidates = (await stagedItems()).filter((item) => order.includes(item.packageName));
+  const unpublished = [];
+  for (const item of candidates) {
+    if (!(await (await client()).published(item.packageName, item.version))) unpublished.push(item);
+  }
+  const staged = unpublished
     .map((item) => ({ id: item.id, name: item.packageName, version: item.version }))
     .sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
   if (staged.length === 0) {
@@ -365,13 +288,14 @@ async function approveStaged() {
   }
   step(`批准上线（${staged.length} 个，按依赖顺序）`);
   for (const item of staged) console.log(dim(`  ${item.name}@${item.version}  ${item.id}`));
+  if (dryRun) { console.log('dry-run：仅查询与显示，不授权、不批准、不验证上线。'); return; }
   await approveAll(staged);
   await verify(staged);
 }
 
 async function waitLive(name, version) {
   for (let i = 0; i < 12; i++) {
-    if (published(name, version)) return true;
+    if (await (await client()).published(name, version)) return true;
     await sleep(5000);
   }
   return false;
@@ -481,17 +405,18 @@ async function main() {
     console.log(`  · ${target.name}@${target.version} 已上线，跳过`);
     return false;
   });
-  const existing = stagedItems();
-  const staged = pending.map((target) => ({ ...target, id: stage(target, existing) }));
+  const existing = await stagedItems();
+  const staged = [];
+  for (const target of pending) staged.push({ ...target, id: await stage(target, existing) });
 
-  step(`批准上线（${staged.length} 个，按依赖顺序；2FA 只需要一次）`);
+  step(`批准上线（${staged.length} 个，按依赖顺序；批次内复用 2FA，服务端可能要求重新验证）`);
   await approveAll(staged);
   await verify(targets);
 }
 
 main()
   .catch((error) => {
-    console.error(`\n${red('✖')} ${error instanceof ReleaseError ? error.message : error.stack ?? error}`);
+    console.error(`\n${red('✖')} ${error instanceof ReleaseError || error instanceof ApprovalError ? error.message : '操作失败（为保护凭据，不显示原始错误）'}`);
     console.error(dim('包都已上传、只是批准没完成：npm run release:approve 续跑；其他情况直接重跑 npm run release（已上线的跳过，已暂存的沿用）。'));
     process.exitCode = 1;
   })
