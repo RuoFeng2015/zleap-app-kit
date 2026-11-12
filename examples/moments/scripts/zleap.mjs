@@ -360,6 +360,11 @@ function finish(appId, installed, diagnosis = null) {
   }
   // 步骤按实际出现的条目连续编号：有的步骤视情况省略，写死序号会出现「1、3」。
   const steps = [];
+  // 数据库还在开通时打开的窗口只握手一次，会一直停在「数据库还没就绪」：先说清要等它就绪再打开（2026-11-12 实测）。
+  const cloudPending = Boolean(cloud && (!cloud.dev || !cloud.databaseReady));
+  if (installed && cloudPending) {
+    steps.push('开发环境 / 数据库还在开通（通常一分钟内就绪）：先等一下，npm run status 看到数据库「已就绪」后再 npm run open。已经打开的窗口不会自动刷新，就绪后点窗口顶部「重新加载应用」。');
+  }
   if (installed) steps.push('npm run open 在浏览器直接打开应用，用本人身份测试，不用发布（也可以从 zleapOS 启动台打开；已打开的窗口点「重新加载应用」）。');
   const background = backgroundCapabilityTitles(readJSON(manifestFile, {}));
   if (background.length > 0 && !diagnosis?.resource_preparation_required) {
@@ -372,8 +377,8 @@ function finish(appId, installed, diagnosis = null) {
       `有云函数 / 后台能力：npx zleap-app prepare ${appId} --version-id ${readJSON(stateFile, {}).versionId ?? '<version_id>'} 补做开发环境准备（平台上传时通常已自动签名并绑定，只有自动签名失败时才会走到这一步），再在应用窗口「权限」里允许后台能力。`,
     );
   }
-  if (cloud && (!cloud.dev || !cloud.databaseReady)) {
-    steps.push('开发环境或数据库还没就绪（安装后通常一分钟内自动就绪）：打开「云开发控制台」选中本应用 → 概览，按提示「创建开发环境」/ 等数据库「已就绪」。');
+  if (cloudPending) {
+    steps.push('等了几分钟仍未就绪：打开「云开发控制台」选中本应用 → 概览，按提示「创建开发环境」/ 查看数据库状态。');
   }
   steps.push('出问题：npm run status 看安装与权限，npm run logs 看页面错误，控制台「运行体检」逐层排查。');
   const manifestValue = readJSON(manifestFile, {});
@@ -493,6 +498,10 @@ function openApp() {
     if (value.status === 'opened') ok(`已在浏览器打开：${value.url}`);
     else ok(`在已登录 zleapOS 的浏览器里打开：${value.url}`);
     if (value.data_domain?.reason) console.log(`  ${value.data_domain.reason}`);
+    // 新版 CLI 会带上数据库状态：还没就绪时窗口会停在「数据库还没就绪」，提前说清楚。
+    if (value.database?.status && value.database.status !== 'ready') {
+      warn('数据库还在开通（通常部署后一分钟内就绪）：现在打开的窗口会显示「数据库还没就绪」且不会自动刷新，就绪后点窗口顶部「重新加载应用」；可以先 npm run status 确认。');
+    }
     console.log('  浏览器里还没登录 zleapOS 时先登录，登录后自动打开应用；改代码后 npm run deploy，再在窗口里点「重新加载应用」。');
     return;
   }
