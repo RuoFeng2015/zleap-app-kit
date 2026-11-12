@@ -98,6 +98,11 @@ test('生成项目：占位符全部替换，JSON/HTML 正确转义，skills 装
   for (const file of ['package.json', 'manifest.json', 'index.html', 'README.md', 'AGENTS.md', 'LICENSE', 'src/App.tsx']) {
     assert.doesNotMatch(readFileSync(join(dir, file), 'utf8'), /__[A-Z_]+__/, file);
   }
+  // 黑盒测试 D7：README 和文档一致——先 preview 看界面，deploy 后 open 本人自测；状态文字与模板一致。
+  const readme = readFileSync(join(dir, 'README.md'), 'utf8');
+  for (const command of ['npm run preview', 'npm run login', 'npm run deploy', 'npm run open']) assert.match(readme, new RegExp(command), command);
+  assert.doesNotMatch(readme, /npm run dev/);
+  assert.doesNotMatch(readme, /OS 已连接/);
   assert.equal(isEmptyDir(dir), false);
 
   const names = installSkills({ skillsDir: join(root, 'skills'), targetDir: dir });
