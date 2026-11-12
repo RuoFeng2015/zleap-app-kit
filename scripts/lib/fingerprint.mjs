@@ -11,13 +11,20 @@ import { config, sdkSourceDir } from './config.mjs';
  * 版本号由 kit.config.json 的 cliVersion 注入：Go 源码里的 appdevcli.Version 只是默认值，发布脚本升版本时不会去改它，
  * 不注入的话 npm 上 0.12.1 的二进制 `zleap-app version` / MCP serverInfo 仍报 0.12.0（全流程测试 e11-11091657-998）。
  * 不注入 Commit：npm 构建与服务端镜像的提交号不同，注入会让 `zleap-app version` 一直误报需要升级。
+ * 源码提交号注入 SourceCommit：只用于 `zleap-app version` 展示和排障（实测 #9：npm 版 commit 为空），不参与升级比较。
+ * 旧版 Go 源码没有这个变量时，链接器会忽略这条 -X，不影响构建。
  */
-export const GO_BUILD_ARGS = ['build', '-trimpath', '-ldflags=-s -w -X zleap-os-go/internal/appdevcli.Version={cliVersion}'];
+export const GO_BUILD_ARGS = [
+  'build',
+  '-trimpath',
+  '-ldflags=-s -w -X zleap-os-go/internal/appdevcli.Version={cliVersion} -X zleap-os-go/internal/appdevcli.SourceCommit={sourceCommit}',
+];
 
-/** 实际编译参数：把 cliVersion 填进 ldflags。 */
-export function goBuildArgs(cliVersion) {
+/** 实际编译参数：把 cliVersion 与源码提交号填进 ldflags。 */
+export function goBuildArgs(cliVersion, sourceCommit = 'unknown') {
   if (!/^\d+\.\d+\.\d+$/.test(cliVersion ?? '')) throw new Error(`cliVersion 无效：${cliVersion}`);
-  return GO_BUILD_ARGS.map((arg) => arg.replace('{cliVersion}', cliVersion));
+  if (!/^[0-9a-z]{1,40}$/.test(sourceCommit)) throw new Error(`源码提交号无效：${sourceCommit}`);
+  return GO_BUILD_ARGS.map((arg) => arg.replace('{cliVersion}', cliVersion).replace('{sourceCommit}', sourceCommit));
 }
 
 /**

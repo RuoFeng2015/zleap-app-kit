@@ -52,6 +52,7 @@ npm create zleap-app@latest <目录> -- --appid <appid> --name "<应用名>" -y
 `appid` 由平台生成，**不能自己编**。还没有应用时**不带 `--appid`** 生成项目，然后请用户运行 `npm run login`：浏览器授权页会写明「新建应用「<应用名>」」，
 用户核对确认码点允许后，平台创建应用（用户是管理员，一次授权只建一个），CLI 把 `appid`（`zl` + 16 位小写十六进制）写进 manifest。
 用户已经有应用时，用 `--appid <appid>` 生成（或填进 manifest），不要再建新的。
+要在平台示例应用（同事圈 `moments`、报销记录 `expense` 等）基础上改造时：**只有超级管理员**能用 MCP `app_examples_list` / `app_examples_pull`（或 `npx zleap-app examples list|pull`）拉完整源码，拉下来已去掉原 appid，`npm install` 后同样 `npm run login` 新建成自己的应用；非超级管理员会被拒绝，此时改用上面的脚手架从模板开始。
 manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI 登录参数名是 `--app-key`，填的就是 appid；CLI 输出里的 `app_key` 字段也是 appid。
 同事要一起开发，请管理员在控制台「团队」→「成员」里把他加为开发者。每个成员的每次上传都是一个开发版本，在控制台「版本管理」里可见；
 成员可以在「版本管理」用「切换到此版本」运行同事上传、未发布的版本（只切自己的安装；非成员看不到开发版本）。带云函数的版本上传时平台自动签名、安装 / 切换 / 允许后台运行时自动绑定，appid 应用不需要签名激活操作。给全企业用 = 在「版本管理」里「发布为线上版本」，见 skill `zleap-cloud-app-release`。
@@ -66,7 +67,7 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 6. **乐观锁**：`update`/`remove` 带 `agentos: { expectedVersion: doc._version }`；冲突 `VERSION_CONFLICT` → 重读再改。
 7. **结果未知不重试**：`COMMIT_UNKNOWN`（CLI 退出码 6）→ 先重读或查询原操作，绝不自动重复提交。
 8. **明确失败优于假成功**：在 zleapOS 里不要用 mock 数据、假登录、吞错误让界面「看起来能用」。唯一例外是**预览模式**：浏览器直接打开（`npm run preview`）没有宿主时，模板用 `preview` 模块的示例数据渲染界面并显示「预览模式」横幅；不要把示例数据用到宿主里的失败兜底上。
-9. **凭据**：登录只能由用户在浏览器确认（`npm run login`），不要索要或输入密码，不要读取/打印 `~/.config/zleap-app/session.json`。
+9. **凭据**：登录只能由用户在浏览器确认（`npm run login`），不要索要或输入密码，不要读取/打印 `~/.config/zleap-app/` 下的会话文件。会话按「OS 地址 + appid」分别保存：同时开发多个应用时，每个项目目录各登录一次，之后切换项目不用重新登录。
 
 ## 界面：用官方样式，做完整的状态（外观与功能同样要验收）
 
@@ -84,6 +85,9 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 
 ## 3. 开发一个功能的标准流程
 
+**一次只做一个功能**：用户给了一组需求时，先拆成几条能单独验收的小功能（每条写清「做完后界面上能看到什么」），按依赖顺序排好（先存数据，后台任务 / 定时触发放最后）。
+每条走完下面 0–7，请用户在 zleapOS 里验收通过后再做下一条；不要一口气写完全部需求再部署，也不要在用户没要求时发布。人读的完整说明见文档站 guide/local-dev。
+
 0. **先查现成能力**：按上面「开发路线」用 MCP 查 OS 接口与 SDK，能直接调的就不建集合、不写云函数。
 1. **建模**：在 `manifest.json` 加集合与 strict schema（类型只支持 object/array/string/number/integer/boolean/null，关键字子集见 references/manifest.md）。日期用 `number` 存毫秒，或 `integer` + `"x-agentos-value-type": "date_ms"`。
 2. **权限**：需要的能力加进 `requires`（`cloud.database.read/write`、`cloud.storage.read/write`、`os.agent.complete` 等，白名单外的非可选能力会让应用「暂不可用」）。`reason` 会展示给用户，写具体用途。
@@ -92,8 +96,8 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 5. **部署到自己桌面**：`npm run deploy`（构建 → 检查 → 上传开发版本（appid 应用仅本人和开发人员可见）→ 安装/切换本人安装 → 按平台诊断准备资源；内容变化时自动递增补丁号）。上传之后的步骤由 `zleap-app deploy` 完成，可重复执行，部署记录在 `.zleap/state.json`；不要再手动 publish / install / update 另起一套记录。
    - 报未登录/会话过期 → 请用户运行 `npm run login -- --target <OS 地址>` 并在浏览器核对确认码。
    - 报 `DATA_MIGRATION_REQUIRED` → 新版本改了 data/storage 声明，见第 5 节。
-6. **请用户验收**：安装时平台会自动创建开发环境、开通数据库并按声明建集合，`npm run deploy` 结束时会打印状态；显示未就绪时，请用户在「云开发控制台」选中应用 →「概览」按提示处理。然后从启动台打开应用（已打开的点「重新加载应用」）。
-7. **排查**：`npm run status`（安装、权限、版本）、`npm run logs`（24h 页面结构化错误 + 本人云函数日志，自动选当前所在环境）、控制台「运行体检」。
+6. **请用户验收**（按这条功能的「做完能看到」逐条核对，并顺手回归之前做好的功能）：安装时平台会自动创建开发环境、开通数据库并按声明建集合，`npm run deploy` 结束时会打印状态；显示未就绪时，请用户在「云开发控制台」选中应用 →「概览」按提示处理。然后运行 `npm run open`（在浏览器打开 zleapOS 并直接拉起本人已装的版本，开发版本不用发布就能测；没装会提示先 deploy），或从启动台打开（已打开的点「重新加载应用」）。
+7. **排查**：`npm run status`（安装、权限、版本）、`npm run logs`（24h 页面结构化错误 + 本人云函数日志，自动选当前所在环境）、控制台「运行体检」。云函数可以不经界面直接测：`npx zleap-app invoke --capability <id> --environment dev --input-file payload.json`（项目目录里省略应用 ID），再 `npm run logs -- --invocation <编号>`。改完回到第 4 步。
 
 `npx zleap-app …` 只在装了 `@zleap-ai/app-cli` 的项目里可用；项目外或原生模板（没有 package.json）请用 `npx @zleap-ai/app-cli …`。原生模板没有 npm 脚本时，用 CLI 等价命令：`npx @zleap-ai/app-cli check .`、`publish .`、`install <app_id>`、`diagnose <app_id>`、`update <app_id> --expected-version-id <当前> --version-id <新>`。
 

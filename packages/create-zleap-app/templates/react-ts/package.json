@@ -18,6 +18,7 @@
     "pack:zip": "npm run build && zleap-app pack dist --output out/app.zip",
     "login": "node scripts/zleap.mjs login",
     "deploy": "node scripts/zleap.mjs deploy",
+    "open": "node scripts/zleap.mjs open",
     "status": "node scripts/zleap.mjs status",
     "logs": "node scripts/zleap.mjs logs",
     "versions": "node scripts/zleap.mjs versions",

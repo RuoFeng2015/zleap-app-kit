@@ -273,13 +273,22 @@ function finish(appId, installed, diagnosis = null) {
   const cloud = cloudStatus(diagnosis);
   if (cloud) {
     const parts = [`开发环境${cloud.dev ? '已创建' : '未创建'}`, `数据库${cloud.databaseReady ? '已就绪' : '未就绪'}`];
-    if (cloud.prod) parts.push('已有生产环境（应用默认运行在生产数据域）');
+    // 本人窗口用哪个数据域：装着未发布的开发版本 → 调试域；装着线上版本 → 正式域（新版 CLI 的 diagnose 给出 data_domain）。
+    const domain = diagnosis?.data_domain?.expected;
+    if (domain) parts.push(domain === 'prod' ? '本人窗口用正式数据域' : '本人窗口用调试数据域');
+    else if (cloud.prod) parts.push('已有生产环境');
     (cloud.dev && cloud.databaseReady ? ok : warn)(parts.join('，'));
   }
   // 步骤按实际出现的条目连续编号：有的步骤视情况省略，写死序号会出现「1、3」。
   const steps = [];
   if (installed) steps.push('从 zleapOS 启动台打开应用（已打开的窗口点「重新加载应用」）。');
-  if (hasBackgroundCapabilities(readJSON(manifestFile, {})) && diagnosis?.resource_preparation_required) {
+  const background = backgroundCapabilityTitles(readJSON(manifestFile, {}));
+  if (background.length > 0 && !diagnosis?.resource_preparation_required) {
+    steps.push(
+      `有云函数 / 后台能力：第一次打开应用时会弹出「应用权限」，在「后台能力」里勾选 ${background.map((title) => `「${title}」`).join('、')} 再保存；没弹出或想改时点窗口顶部「权限」。不勾选时 callFunction 会报 BACKGROUND_CAPABILITY_UNAVAILABLE。`,
+    );
+  }
+  if (background.length > 0 && diagnosis?.resource_preparation_required) {
     steps.push(
       `有云函数 / 后台能力：npx zleap-app prepare ${appId} --version-id ${readJSON(stateFile, {}).versionId ?? '<version_id>'} 补做开发环境准备（平台上传时通常已自动签名并绑定，只有自动签名失败时才会走到这一步），再在应用窗口「权限」里允许后台能力。`,
     );
@@ -300,10 +309,11 @@ function finish(appId, installed, diagnosis = null) {
   console.log(`  （app_id=${appId}，状态记录在 .zleap/state.json）`);
 }
 
-/** manifest 里声明了 headless 后台能力（云函数等）。 */
-function hasBackgroundCapabilities(value) {
+/** manifest 里 headless 后台能力的名称（窗口「权限」里按 title 显示）。 */
+function backgroundCapabilityTitles(value) {
   const provides = value?.runtime?.capabilities?.provides;
-  return Array.isArray(provides) && provides.some((item) => item?.execution === 'headless');
+  if (!Array.isArray(provides)) return [];
+  return provides.filter((item) => item?.execution === 'headless').map((item) => String(item.title || item.id));
 }
 
 function currentAppId() {
@@ -371,7 +381,13 @@ async function release() {
   }
   const out = result.json ?? {};
   if (out.unchanged) ok(`${label} 已经是线上版本`);
-  else ok(`已发布：线上版本为 v${out.version ?? state.version}。使用者下次打开自动更新，正在用的窗口会收到更新提示（24 小时后自动切换）。`);
+  else {
+    ok(`已发布：线上版本为 v${out.version ?? state.version}。使用者下次打开自动更新，正在用的窗口会收到更新提示（24 小时后自动切换）。`);
+    console.log(
+      '  注意：你自己装的这个版本现在也是线上版本，重新打开窗口后改用正式数据域（全体使用者的真实数据）；开发期写入的数据留在调试域，不会搬过去，看起来像「数据没了」。' +
+        '\n  开发期数据可在「云开发控制台」→ 数据库切到开发环境查看；要继续在调试域测试，改完 npm run deploy 上传新的开发版本即可（装着未发布的开发版本时窗口自动用调试域）。',
+    );
+  }
 }
 
 function passthrough(args) {

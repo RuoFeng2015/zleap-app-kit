@@ -78,7 +78,7 @@ for (const platform of selected) {
   process.stdout.write(`构建 ${platformSuffix(platform)}（${platform.goos}/${platform.goarch.join('+')}）… `);
   const slices = platform.goarch.map((goarch) => (platform.goarch.length > 1 ? `${output}-${goarch}` : output));
   platform.goarch.forEach((goarch, i) => {
-    execFileSync(go, [...goBuildArgs(config.cliVersion), '-o', slices[i], './cmd/zleap-app'], {
+    execFileSync(go, [...goBuildArgs(config.cliVersion, commit), '-o', slices[i], './cmd/zleap-app'], {
       cwd: source,
       stdio: ['ignore', 'inherit', 'inherit'],
       env: { ...process.env, CGO_ENABLED: '0', GOOS: platform.goos, GOARCH: goarch, GOFLAGS: '-buildvcs=false' },
