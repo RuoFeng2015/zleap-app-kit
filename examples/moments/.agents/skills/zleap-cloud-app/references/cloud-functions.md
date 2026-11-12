@@ -117,7 +117,7 @@
 要点：
 
 - `provider.permissions.capabilities` 必须是 `requires` 的子集；`permissions.data[].collection` 必须在 `data.collections` 里——否则上传被拒；
-- `input_schema` 会在**提交时**校验（不符返回 `INVOCATION_INPUT_INVALID`），`output_schema` 会约束函数返回值；
+- `input_schema` 会在**提交时**校验：不符时前端 SDK 抛 `SCHEMA_INVALID`（服务端原因 `INVOCATION_INPUT_INVALID`，HTTP 业务码 42200），`output_schema` 会约束函数返回值；
 - `background.modes` 要含 `"on_demand"` 才能被手动 / 应用调用；定时触发还要含 `"scheduled"`（见 [触发器](triggers.md)）；
 - `background.on_install` 固定为 `"disabled"`：**安装不会让任何后台能力自动运行**。
 
@@ -168,8 +168,8 @@ export async function main(event, context) {
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Node 版本             | **以实际部署镜像为准。** `node-lts/1` 画像在 `profile.json` 里登记为 Node 24.21.0（linux / arm64，非 root），但仓库中的沙箱镜像 Dockerfile 目前基于 `node:22-bookworm-slim`，两者尚未对齐。请勿依赖 Node 22 之后才有的特性，也不要写死补丁版本 |
 | 网络                  | **无**（`network_policy: none`）——函数里不能 `fetch` 外部地址                                                                                                                                                                                  |
-| `timeout_seconds`     | 1–300，默认 30                                                                                                                                                                                                                                 |
-| `memory_mb`           | 64–4096，默认 512                                                                                                                                                                                                                              |
+| `timeout_seconds`     | 1–300，默认 30；`node-lts/1` 实际上限 30，写更大按 30 执行                                                                                                                                                                                                   |
+| `memory_mb`           | 64–4096，默认 512；`node-lts/1` 实际上限 512，写更大按 512 执行                                                                                                                                                                                                |
 | CPU / 进程数 / 临时盘 | 1000 millicore / 64 / 64 MB（固定，不可配置）                                                                                                                                                                                                  |
 | 返回值大小            | ≤ 256 KiB                                                                                                                                                                                                                                      |
 | 日志                  | 每次调用 ≤ 1 MiB，单行 ≤ 16 KiB                                                                                                                                                                                                                |
@@ -278,7 +278,26 @@ await zl.cloud.os.database.mutate({
 ```
 
 可用参数：`collection`、`operation`、`document_key`（`add` 以外必填）、`data`、`value_types`、`field_operations`、
-`expected_version`（`add` 不接受）、`operation_id`、`request_id`（必填）。`remove` 不接受 `data`。
+`expected_version`（`add` 不接受）、`operation_id`（必填，格式见[操作编号](#操作编号)）、`request_id`（必填）。`remove` 不接受 `data`。
+
+> **写操作必须带 `operation_id`**（危险）
+>
+> `mutate` 的 `add` / `set` / `update` / `remove` 都必须带合法的 `operation_id`，缺了或格式不对会被网关拒绝（`GATEWAY_OPERATION_ID_INVALID`）；
+> 函数里没捕获的话，整次调用以 `USER_EXCEPTION` 失败（定时触发器每次都会失败）。用下面[操作编号](#操作编号)里的 `operationIdFor(context, 用途)` 生成。
+
+返回值形如 `{ operation_id, stats, document: { _id, _version } }`：`document._id` 是新文档（`add`）或被写文档的键，
+`document._version` 是写入后的版本号，下次 `update` / `remove` 时作为 `expected_version` 传回去。
+
+```js
+const saved = await zl.cloud.os.database.mutate({
+  collection: 'drafts',
+  operation: 'add',
+  data,
+  operation_id: operationIdFor(context, 'add'),
+  request_id: `${context.invocationId}:add`,
+});
+return { id: saved.document._id, version: saved.document._version };
+```
 
 > **字段命名是 snake_case**（危险）
 >
@@ -656,12 +675,12 @@ console.log(job.result);
 
 ### 其他作业 API
 
-| API                                                                                  | 说明                                                                                                                              |
-| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `jobs.wait({ jobId, timeoutSeconds?, pollMilliseconds? })`                           | 等到终态；`timeoutSeconds` 0–300（默认 25），`pollMilliseconds` 100–5000（默认 500）；超时仍未结束抛 `CALL_TIMEOUT`（带 `jobId`） |
-| `jobs.get({ jobId })` / `jobs.result({ jobId })`                                     | 读一次当前状态                                                                                                                    |
-| `jobs.submit({ kind: 'capability', capability, input, operationId?, waitSeconds? })` | 与 `capabilities.invoke` 等价的另一种写法                                                                                         |
-| `jobs.cancel({ jobId })`                                                             | 请求取消，返回 `{ cancelRequested: true }`。**取消不是回滚**                                                                      |
+| API                                                                                  | 说明                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jobs.wait({ jobId, timeoutSeconds?, pollMilliseconds? })`                           | 等到终态；`timeoutSeconds` 0–300（默认 25），`pollMilliseconds` 100–5000（默认 500）；超时仍未结束抛 `CALL_TIMEOUT`（带 `jobId`）                                                         |
+| `jobs.get({ jobId })` / `jobs.result({ jobId })`                                     | 读一次当前状态                                                                                                                                                                            |
+| `jobs.submit({ kind: 'capability', capability, input, operationId?, waitSeconds? })` | 与 `capabilities.invoke` 等价的另一种写法                                                                                                                                                 |
+| `jobs.cancel({ jobId })`                                                             | 请求取消，返回 `{ cancelRequested: true }`。排队中或函数还没开始写数据时，作业以 `cancelled` 结束；正在执行的函数会被立即停止，结果为 `cancelled`。**取消不是回滚**：已提交的写入不会撤销 |
 
 同一个 `operationId` 再次提交、输入相同 → 返回原作业；输入不同 → 冲突「同一操作编号的输入不同」。
 每人同时在排队 / 执行的后台作业最多 16 个（超出 429「本人后台调用队列已满」）。
@@ -844,7 +863,7 @@ const job = await zl.cloud.os.capabilities.invoke({
 
 ### `FUNCTION_DEADLINE_EXCEEDED`
 
-超过 `deadlineAt`。长任务请拆成多步，或调大 `timeout_seconds`（≤300）。
+超过 `deadlineAt`。长任务请拆成多步（每步在 30 秒内完成，用作业或触发器串起来）；`node-lts/1` 下 `timeout_seconds` 实际上限 30，调大没有效果。
 
 ### 云函数里读写被拒
 

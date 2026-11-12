@@ -29,20 +29,20 @@ my-todo/
     ├── index.js / index.d.ts          # zl.cloud：数据库、文件、后台调用（本页）
     ├── execution.js / files.js / values.js / protocol.js / transport.js（及 .d.ts）
     ├── workspace.js / workspace.d.ts  # 工作区文件（host_api.requires: workspace.files；读图片另需 workspace.images.read）
-    └── zleap-sdk.js / zleap-sdk.d.ts  # 宿主 SDK：connectHostedApp()（kv、files、close；不含剪贴板封装）
+    └── zleap-sdk.js / zleap-sdk.d.ts  # 宿主 SDK：connectHostedApp()（kv、files、close；剪贴板用 zl.app.setClipboardData）
 ```
 
 SDK 版本与 `zleap-app` 可执行文件一起发布。用 `npm create zleap-app` 生成的 React 项目改为依赖 npm 包
 `@zleap-ai/app-sdk`：`@zleap-ai/app-sdk` 对应 `sdk/index.js`，`/host` 对应 `sdk/zleap-sdk.js`，`/workspace` 对应 `sdk/workspace.js`，
-API 完全相同，版本与 `@zleap-ai/app-cli` 保持一致（同为 `0.10.x`）：
+API 完全相同。SDK 与 `@zleap-ai/app-cli` 各自发版，版本号不必相同：
 
 ```bash
-npm i @zleap-ai/app-sdk
-npm i -D @zleap-ai/app-cli      # 两者同版本，握手协议才匹配
+npm i @zleap-ai/app-sdk@latest
+npm i -D @zleap-ai/app-cli@latest
 ```
 
 **不要**再从 `zleap-web` 源码自行构建、复制 SDK——旧文档里的做法已过时，
-版本不匹配会在握手时报 `PROTOCOL_MISMATCH`。
+与宿主协议不匹配的 SDK 会在握手时报 `PROTOCOL_MISMATCH`。
 
 > **三种「存储」别混用**（提示）
 >
@@ -386,7 +386,9 @@ off(); // 取消订阅
 - 回调**只带变更坐标，不带文档内容**——收到后用 `get` / `watch` 重读；
 - 只会收到**本集合**的变更（一个订阅覆盖应用所有集合，SDK 按 `collection_key` 过滤）；
 - 推送是**协商可选**的：宿主没有推送能力、或还没 `init` 时返回一个空的取消函数，回调永远不会触发。
-  所以**保留一个低频的 `watch` / `get` 兜底是安全的**，不要假设一定有实时通知。
+  所以**保留一个低频的 `watch` / `get` 兜底是安全的**，不要假设一定有实时通知；
+- 时延：写入确认后平台立即转发，通常 1 秒内到达；平台繁忙时退回定时转发，可能延迟到几十秒。
+  自己写入后要马上看到结果的，直接用写入返回值或重读，不要等 `onChange`。
 
 ### 不支持的方法
 

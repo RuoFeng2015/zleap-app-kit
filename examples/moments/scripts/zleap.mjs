@@ -1,27 +1,38 @@
 #!/usr/bin/env node
 // 项目内的一键命令，封装 zleap-app CLI：
 //
-//   npm run login  [-- --target https://os.example.com]   浏览器授权，保存开发会话（自动续期，最长 30 天）
-//   npm run deploy [-- --no-build] [--no-install]          构建 → 检查 → 上传开发版本 → 安装/切换到新版本
+//   npm run login  [-- --target https://os.example.com] [--browser-timeout 10m]  浏览器授权，保存开发会话（自动续期，最长 30 天）
+//   npm run deploy [-- --no-build] [--no-install]          构建 → 检查 → zleap-app deploy（上传开发版本 → 安装/切换 → 按诊断准备资源）
 //   npm run status                                        查看本应用的安装、权限与可用版本
 //   npm run versions                                      列出全部成员上传的开发版本、当前线上版本和发布记录
 //   npm run release [-- --version-id <id>] [--notes 说明] [--yes]
 //                                                         把开发版本（默认最近一次 deploy 的）发布为线上版本；回退 = 发布旧版本
 //   npm run logs   [-- --environment dev|prod] [--invocation <调用编号>]
 //                                                         查看最近 24 小时应用页面上报的错误与本人云函数日志
+//   npm run open    [-- --no-browser]                     在浏览器打开 zleapOS 并直接拉起本人已装的应用窗口（deploy 后自测，不用发布）
+//   npm run preview [-- --port 5180]                      预览模式：浏览器直接打开页面，用示例数据渲染界面（调样式、截图自查）
+//                                                         默认从 5180 起找空闲端口；写了 --port 就只用这个端口
+//   node scripts/zleap.mjs sdk                            vanilla 模板：把 Cloud SDK 从 node_modules 复制进应用目录
 //
 // 设计约束（与平台一致）：结果未知（COMMIT_UNKNOWN）时不自动重试；不替你做数据迁移；不碰生产环境。
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { createServer as createNetServer } from 'node:net';
+import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const stateDir = join(root, '.zleap'); // zleap-app pack 会排除 .zleap/，且已写入 .gitignore
 const configFile = join(stateDir, 'config.json');
-const stateFile = join(stateDir, 'state.json');
-const manifestFile = join(root, 'manifest.json');
+const stateFile = join(stateDir, 'state.json'); // 由 zleap-app deploy 写入，本脚本只读
+// 项目形态写在 package.json 的 zleap 字段：packageDir 是上传的目录，build=false 表示不用构建（vanilla 模板），
+// sdkDir 是要从 node_modules 复制 Cloud SDK 的目录。React 模板缺省为 dist/ + 构建。
+const project = { packageDir: 'dist', build: true, sdkDir: '', ...(readJSON(join(root, 'package.json'), {}).zleap ?? {}) };
+const packageDir = project.packageDir;
+// 构建型项目的 manifest 在项目根目录（构建时复制进产物）；不构建的项目 manifest 就在上传目录里。
+const manifestFile = existsSync(join(root, 'manifest.json')) ? join(root, 'manifest.json') : join(root, packageDir, 'manifest.json');
 
 const argv = process.argv.slice(2);
 const command = argv[0];
@@ -55,14 +66,14 @@ function cliCommand() {
   return { file: bin, prefix: [], shell: process.platform === 'win32' };
 }
 
-/** 调用 zleap-app。capture=true 时解析 stdout 中的 JSON。 */
-function cli(args, { capture = true } = {}) {
+/** 调用 zleap-app。capture=true 时解析 stdout 中的 JSON；liveStderr=true 时进度（如授权链接）直接显示在终端。 */
+function cli(args, { capture = true, liveStderr = false } = {}) {
   const { file, prefix, shell } = cliCommand();
   const result = spawnSync(file, [...prefix, ...args], {
     cwd: root,
     shell,
     encoding: 'utf8',
-    stdio: capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+    stdio: capture ? ['inherit', 'pipe', liveStderr ? 'inherit' : 'pipe'] : 'inherit',
   });
   if (result.error) throw new StepError(`无法运行 zleap-app：${result.error.message}`);
   // 被信号杀掉时 status 为 null、没有任何输出（例如 macOS 拒绝运行签名缓存不一致的二进制会发 SIGKILL）。
@@ -100,9 +111,9 @@ function needLogin(stderr) {
 
 function manifest() {
   const value = readJSON(manifestFile);
-  // appid 由平台生成（云开发控制台「创建应用」）；旧项目写的是 app_key，同样可用
+  // appid 由平台生成：npm run login 时自动新建，或在云开发控制台「创建应用」后填入；旧项目写的是 app_key，同样可用
   if (!value?.appid && !value?.app_key)
-    throw new StepError('manifest.json 缺少 appid：先在 zleapOS 云开发控制台「创建应用」，把 appid 填进 manifest.json');
+    throw new StepError('manifest.json 还没有 appid：先运行 npm run login（会在授权时自动新建应用），或把云开发控制台里应用的 appid 填进 manifest.json');
   return value;
 }
 
@@ -112,6 +123,20 @@ function bumpPatch(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)(.*)$/.exec(version);
   if (!match) throw new StepError(`无法自动递增版本号「${version}」，请手动修改 manifest.json 的 version`);
   return `${match[1]}.${match[2]}.${Number(match[3]) + 1}`;
+}
+
+/** 比较 x.y.z（与平台一致：数字核心相同时，带预发布后缀的低于正式版；两个预发布之间按字符串）。无法解析时返回 0。 */
+function compareVersion(a, b) {
+  const pa = /^(\d+)\.(\d+)\.(\d+)/.exec(a);
+  const pb = /^(\d+)\.(\d+)\.(\d+)/.exec(b);
+  if (!pa || !pb) return 0;
+  for (let i = 1; i <= 3; i += 1) if (Number(pa[i]) !== Number(pb[i])) return Number(pa[i]) - Number(pb[i]);
+  const ra = /^[^-+]*-([^+]*)/.exec(a)?.[1] ?? '';
+  const rb = /^[^-+]*-([^+]*)/.exec(b)?.[1] ?? '';
+  if (ra === rb) return 0;
+  if (!ra) return 1;
+  if (!rb) return -1;
+  return ra < rb ? -1 : 1;
 }
 
 const stripDigest = (value) => String(value ?? '').replace(/^sha256:/, '');
@@ -133,14 +158,48 @@ async function login() {
   let target = option('target') || process.env.ZLEAP_TARGET || config.target;
   if (!target) target = await ask('zleapOS 地址（例如 https://os.example.com）：', '');
   if (!target) throw new StepError('请提供 OS 地址：npm run login -- --target https://os.example.com');
-  const appKey = appIdOf(manifest());
-  log(`登录 ${target}（应用 ${appKey}）。浏览器打开后，核对页面与终端里的确认码一致再允许。`);
-  const args = ['auth', 'login', '--target', target, '--app-key', appKey];
+  const value = readJSON(manifestFile, {});
+  const appKey = appIdOf(value);
+  let args;
+  if (appKey) {
+    log(`登录 ${target}（应用 ${appKey}）。浏览器打开后，核对页面与终端里的确认码一致再允许。`);
+    args = ['auth', 'login', '--target', target, '--app-key', appKey];
+  } else {
+    // 还没有 appid：在同一次授权里新建应用（本人为管理员，一次授权最多建一个），CLI 把 appid 写回 manifest.json。
+    if (!value?.name) throw new StepError('manifest.json 缺少 name，无法新建应用');
+    log(`登录 ${target} 并新建应用「${value.name}」。浏览器打开后，核对确认码一致再允许。`);
+    args = ['auth', 'login', '--target', target, '--create-app', '--name', value.name];
+  }
   if (has('no-browser')) args.push('--no-browser');
-  const result = cli(args, { capture: false });
-  if (result.code !== 0) throw new StepError('登录未完成');
+  // 浏览器授权默认等 5 分钟；需要更久（例如要先找管理员开账号）时用 --browser-timeout 10m（最长 10 分钟）。
+  const timeout = option('browser-timeout');
+  if (timeout) {
+    const minutes = durationMinutes(timeout);
+    if (minutes === null || minutes <= 0 || minutes > 10) {
+      throw new StepError(`--browser-timeout ${timeout} 超出范围：浏览器授权最长等 10 分钟，请改成 --browser-timeout 10m 或更短`);
+    }
+    args.push('--browser-timeout', timeout);
+  }
   writeJSON(configFile, { ...config, target });
+  // 新建应用时要拿到 stdout 里的 appid，授权链接和确认码仍实时显示。
+  const result = cli(args, { capture: !appKey, liveStderr: true });
+  if (result.code !== 0) {
+    // 具体原因 zleap-app 已经打印在上面（stderr 实时输出）；「部署不支持登录时新建应用」时它自己会说明去控制台创建。
+    throw new StepError('登录未完成，原因见上面 zleap-app 的输出');
+  }
+  if (!appKey) ok(`已新建应用：appid=${result.json?.app_key ?? appIdOf(readJSON(manifestFile, {}))}（已写入 manifest.json）`);
   ok('已登录：访问凭据自动续期，授权最长 30 天（到期或 auth logout 后重新登录）');
+}
+
+/** Go 时长写法（10m、90s、1h、1m30s）换算成分钟；写不对返回 null。 */
+function durationMinutes(text) {
+  const parts = String(text).trim().match(/^(?:\d+(?:\.\d+)?(?:ms|s|m|h))+$/) ? String(text).trim().match(/\d+(?:\.\d+)?(?:ms|s|m|h)/g) : null;
+  if (!parts) return null;
+  const unit = { ms: 1 / 60000, s: 1 / 60, m: 1, h: 60 };
+  return parts.reduce((sum, part) => {
+    const [, value, name] = part.match(/^(\d+(?:\.\d+)?)(ms|s|m|h)$/);
+    return sum + Number(value) * unit[name];
+  }, 0);
 }
 
 function publishedVersions() {
@@ -152,8 +211,19 @@ function publishedVersions() {
   return Array.isArray(result.json) ? result.json : [];
 }
 
+/** vanilla 模板：把 npm 包里的 Cloud SDK 复制到应用目录，页面用 import { zl } from './sdk/index.js'。 */
+function syncSdk() {
+  if (!project.sdkDir) return;
+  const from = join(root, 'node_modules', '@zleap-ai', 'app-sdk', 'dist');
+  if (!existsSync(join(from, 'index.js'))) throw new StepError('没有找到 @zleap-ai/app-sdk，请先安装依赖（npm install）。');
+  mkdirSync(join(root, project.sdkDir), { recursive: true });
+  for (const file of ['index.js', 'host.js', 'workspace.js', 'zleap.css']) {
+    if (existsSync(join(from, file))) copyFileSync(join(from, file), join(root, project.sdkDir, file));
+  }
+}
+
 function checkDist() {
-  const result = cli(['check', 'dist']);
+  const result = cli(['check', packageDir]);
   if (result.code !== 0 || result.json?.status !== 'passed') {
     throw new StepError(`本地检查未通过：${result.stderr || result.stdout}`);
   }
@@ -170,10 +240,12 @@ function requireSupportedNode() {
 }
 
 async function deploy() {
-  requireSupportedNode();
+  manifest(); // 还没有 appid 时先说清楚：npm run login 会新建应用
+  if (project.build) requireSupportedNode();
   const build = () => {
-    if (has('no-build')) return;
-    log('构建 dist/');
+    syncSdk();
+    if (!project.build || has('no-build')) return;
+    log(`构建 ${packageDir}/`);
     npmRun('build');
   };
 
@@ -181,81 +253,65 @@ async function deploy() {
   let report = checkDist();
   ok(`检查通过：${report.app_key} v${report.version}（${report.files} 个文件，runtime_test=${report.runtime_test}）`);
 
-  // 同一版本号只能对应一份内容；内容变了就自动递增补丁号。
-  const existing = publishedVersions().find((row) => row.app_key === report.app_key && row.version === report.version);
-  if (existing && (stripDigest(existing.digest) !== stripDigest(report.digest) || !['private', 'members'].includes(existing.visibility))) {
-    if (has('no-build')) throw new StepError(`版本 ${report.version} 已上传过不同内容，请修改 version 后重新构建`);
+  // 同一版本号只能对应一份内容；内容变了就自动递增补丁号（构建型项目要重新构建，所以在这里做）。
+  // 同内容：平台 appid 应用即使这个版本已发布为线上版本，平台也直接复用（同事拉同一份代码 deploy 装上同一版本）；
+  // 只有旧命名空间 app_key 的已公开版本不能再作为开发版本上传，才需要换版本号。
+  // 平台 appid 应用的新版本号必须高于已上传的全部版本（平台拒绝更低的号，VERSION_NOT_INCREASING）：
+  // 不高于时自动改成「最高版本 + 1 个补丁号」。zleap-app status 列出全部成员上传的版本。
+  const uploaded = publishedVersions().filter((row) => row.app_key === report.app_key);
+  const existing = uploaded.find((row) => row.version === report.version);
+  const platform = /^zl[0-9a-f]{16}$/.test(report.app_key);
+  const changed = existing && stripDigest(existing.digest) !== stripDigest(report.digest);
+  const legacyPublished = existing && !platform && !['private', 'members'].includes(existing.visibility);
+  const highest = uploaded.reduce((top, row) => (top === null || compareVersion(row.version, top) > 0 ? row.version : top), null);
+  const notHigher = platform && !existing && highest !== null && compareVersion(report.version, highest) <= 0;
+  if (changed || legacyPublished || notHigher) {
+    const why = notHigher
+      ? `不高于已上传的版本 ${highest}（新版本号必须更高）`
+      : changed
+        ? '已上传过不同内容'
+        : '已公开发布（旧命名空间应用的开发版本需要新版本号）';
+    if (project.build && has('no-build')) throw new StepError(`版本 ${report.version} ${why}，请修改 version 后重新构建`);
     const current = manifest();
-    const next = bumpPatch(current.version);
-    warn(`版本 ${current.version} 已上传过不同内容，自动递增为 ${next}`);
+    let next = bumpPatch(current.version);
+    if (platform && highest !== null && compareVersion(next, highest) <= 0) next = bumpPatch(highest);
+    warn(`版本 ${current.version} ${why}，自动改为 ${next}`);
     writeJSON(manifestFile, { ...current, version: next });
     build();
     report = checkDist();
   }
 
-  // appid 应用的上传是只有应用成员可见的开发版本；旧 app_key 应用是本人 private。都不会直接给全企业用。
-  log('上传开发版本');
-  const published = cli(['publish', 'dist']);
-  if (published.code === 6) {
-    const requestId = published.json?.request_id;
-    throw new StepError(
-      `上传结果未知（COMMIT_UNKNOWN）。不要重新上传，先查询原操作：\n  npx zleap-app operation --request-id ${requestId ?? '<request_id>'}`,
-    );
+  // 上传、安装 / 切换本人安装、按诊断准备资源都交给 zleap-app deploy：每步先查平台事实，重复执行安全，
+  // 部署记录写在 .zleap/state.json。appid 应用的上传是只有成员可见的开发版本，不会直接给全企业用。
+  log('上传开发版本并装到本人');
+  const args = ['deploy', '.', '--package-dir', packageDir];
+  if (has('no-install')) args.push('--no-install');
+  const result = cli(args);
+  const out = result.json ?? {};
+  if (result.code !== 0) {
+    if (/未知命令 deploy/.test(result.stderr)) {
+      throw new StepError(`当前 zleap-app 版本太旧，不支持 deploy：npm i -D ${'@zleap-ai/app-cli'}@latest @zleap-ai/app-sdk@latest`);
+    }
+    if (needLogin(result.stderr)) throw new StepError(`${result.stderr}\n先运行 npm run login`);
+    if (result.code === 6 || out.status === 'unknown') {
+      throw new StepError(`${out.stage ?? '部署'}结果未知（COMMIT_UNKNOWN）：不要手动重复操作。重新运行 npm run deploy 会先按原操作号核对，不会重复上传。`);
+    }
+    const reason = out.error ?? result.stderr;
+    throw new StepError([`部署停在「${out.stage ?? '未知阶段'}」：${reason}`, out.next].filter(Boolean).join('\n'));
   }
-  if (published.code !== 0) {
-    if (needLogin(published.stderr)) throw new StepError(`${published.stderr}\n先运行 npm run login`);
-    throw new StepError(`上传被拒绝：${published.stderr}`);
-  }
-  const pack = published.json?.result?.package ?? {};
-  const appId = id(pack.app_id);
-  const versionId = id(pack.version_id);
-  const packageId = id(pack.id);
-  if (!appId || !versionId) throw new StepError(`上传回执缺少 app_id / version_id：${published.stdout}`);
-  ok(`已上传 v${report.version}：app_id=${appId} version_id=${versionId} package_id=${packageId}`);
+  const appId = id(out.app_id);
+  const versionId = id(out.version_id);
+  ok(`已上传 v${report.version}：app_id=${appId} version_id=${versionId} package_id=${id(out.package_id)}`);
   // 平台 appid 应用：带云函数 / 后台能力的版本上传后平台自动签名；签不上时回执带原因（旧平台没有这个字段）。
-  const autoSign = published.json?.result?.auto_sign;
-  if (autoSign?.status === 'failed') {
+  if (out.auto_sign?.status === 'failed') {
     warn(
-      `平台自动签名失败（${autoSign.reason ?? '未知原因'}）：云函数 / 后台能力暂时不可用。打开应用或切换版本时平台会自动重试；` +
+      `平台自动签名失败（${out.auto_sign.reason ?? '未知原因'}）：云函数 / 后台能力暂时不可用。打开应用或切换版本时平台会自动重试；` +
         `也可以运行 npx zleap-app prepare ${appId} --version-id ${versionId} 查看详细错误。`,
     );
   }
-  writeJSON(stateFile, { appId, versionId, packageId, version: report.version, digest: report.digest, at: new Date().toISOString() });
-
   if (has('no-install')) return finish(appId, false);
-
-  let diagnosis = cli(['diagnose', appId]);
-  if (diagnosis.code !== 0) throw new StepError(`读取安装状态失败：${diagnosis.stderr}`);
-  if (!diagnosis.json?.installed) {
-    log('安装给自己');
-    const installed = cli(['install', appId]);
-    if (installed.code !== 0) throw new StepError(`安装失败：${installed.stderr}`);
-    diagnosis = cli(['diagnose', appId]);
-  }
-  const current = id(diagnosis.json?.version_id);
-  if (current && current !== versionId) {
-    log(`把本人安装从 version_id=${current} 切换到 ${versionId}`);
-    const updated = cli(['update', appId, '--expected-version-id', current, '--version-id', versionId]);
-    if (updated.code !== 0) {
-      if (/COLLECTION_PARTITION_IMMUTABLE/.test(updated.stderr)) {
-        throw new StepError(
-          '新版本改了已有集合的 private / shared（数据归属），平台拒绝切换（COLLECTION_PARTITION_IMMUTABLE），当前安装保持原版本。\n' +
-            '集合建好后归属不能改：把这些集合的 partition 改回和当前版本一致；要换归属请新建一个集合并迁移数据。',
-        );
-      }
-      if (/DATA_MIGRATION_REQUIRED/.test(updated.stderr)) {
-        throw new StepError(
-          '新版本改动了 data / storage 声明，平台拒绝直接切换（DATA_MIGRATION_REQUIRED），当前安装保持原版本。\n' +
-            '注意：已建好的集合结构不会随新版本改变。开发阶段可以 npx zleap-app uninstall <app_id> 后再 npm run deploy（卸载保留数据）；\n' +
-            '要改字段结构请新建集合并自行迁移数据。',
-        );
-      }
-      if (updated.code === 6) throw new StepError(`切换结果未知，先运行 npm run status 核对，不要重复切换。`);
-      throw new StepError(`切换版本失败：${updated.stderr}`);
-    }
-  }
   ok(`本人安装已是 v${report.version}`);
-  finish(appId, true, cli(['diagnose', appId]).json);
+  finish(appId, true, out.diagnosis ?? null);
 }
 
 /** 安装时平台会自动创建开发环境并开通数据库；这里按真实状态提示，而不是一律让用户去控制台创建。 */
@@ -267,10 +323,19 @@ function cloudStatus(diagnosis) {
   return { dev: keys.includes('dev'), prod: keys.includes('prod'), databaseReady: allocation === 'ready' };
 }
 
+/** manifest 是否用到云资源（集合、cloud.* 权限或后台能力）；用不到时不提示开发环境与数据库。 */
+function needsCloud(value) {
+  const collections = value?.data?.collections;
+  const requires = value?.runtime?.capabilities?.requires;
+  return (
+    (Array.isArray(collections) && collections.length > 0) ||
+    (Array.isArray(requires) && requires.some((item) => String(item?.id ?? '').startsWith('cloud.'))) ||
+    hasBackgroundCapabilities(value)
+  );
+}
+
 function finish(appId, installed, diagnosis = null) {
-  const state = readJSON(stateFile, {});
-  writeJSON(stateFile, { ...state, appId });
-  const cloud = cloudStatus(diagnosis);
+  const cloud = needsCloud(readJSON(manifestFile, {})) ? cloudStatus(diagnosis) : null;
   if (cloud) {
     const parts = [`开发环境${cloud.dev ? '已创建' : '未创建'}`, `数据库${cloud.databaseReady ? '已就绪' : '未就绪'}`];
     // 本人窗口用哪个数据域：装着未发布的开发版本 → 调试域；装着线上版本 → 正式域（新版 CLI 的 diagnose 给出 data_domain）。
@@ -281,7 +346,7 @@ function finish(appId, installed, diagnosis = null) {
   }
   // 步骤按实际出现的条目连续编号：有的步骤视情况省略，写死序号会出现「1、3」。
   const steps = [];
-  if (installed) steps.push('从 zleapOS 启动台打开应用（已打开的窗口点「重新加载应用」）。');
+  if (installed) steps.push('npm run open 在浏览器直接打开应用，用本人身份测试，不用发布（也可以从 zleapOS 启动台打开；已打开的窗口点「重新加载应用」）。');
   const background = backgroundCapabilityTitles(readJSON(manifestFile, {}));
   if (background.length > 0 && !diagnosis?.resource_preparation_required) {
     steps.push(
@@ -293,8 +358,8 @@ function finish(appId, installed, diagnosis = null) {
       `有云函数 / 后台能力：npx zleap-app prepare ${appId} --version-id ${readJSON(stateFile, {}).versionId ?? '<version_id>'} 补做开发环境准备（平台上传时通常已自动签名并绑定，只有自动签名失败时才会走到这一步），再在应用窗口「权限」里允许后台能力。`,
     );
   }
-  if (!cloud || !cloud.dev || !cloud.databaseReady) {
-    steps.push('开发环境或数据库还没就绪：打开「云开发控制台」选中本应用 → 概览，按提示「创建开发环境」/ 等数据库「已就绪」。');
+  if (cloud && (!cloud.dev || !cloud.databaseReady)) {
+    steps.push('开发环境或数据库还没就绪（安装后通常一分钟内自动就绪）：打开「云开发控制台」选中本应用 → 概览，按提示「创建开发环境」/ 等数据库「已就绪」。');
   }
   steps.push('出问题：npm run status 看安装与权限，npm run logs 看页面错误，控制台「运行体检」逐层排查。');
   const manifestValue = readJSON(manifestFile, {});
@@ -316,19 +381,27 @@ function backgroundCapabilityTitles(value) {
   return provides.filter((item) => item?.execution === 'headless').map((item) => String(item.title || item.id));
 }
 
+/** manifest 里声明了 headless 后台能力（云函数等）。 */
+function hasBackgroundCapabilities(value) {
+  const provides = value?.runtime?.capabilities?.provides;
+  return Array.isArray(provides) && provides.some((item) => item?.execution === 'headless');
+}
+
 function currentAppId() {
   const appId = option('app-id') || readJSON(stateFile, {}).appId;
   if (!appId) throw new StepError('还没有部署记录，先运行 npm run deploy（或用 --app-id 指定）');
   return appId;
 }
 
-/** 日志查的环境要和应用实际所在的数据域一致：应用有生产环境时发布者走 prod，否则走 dev。 */
+/** 日志查的环境要和本人窗口实际所在的数据域一致：装着线上版本走 prod，装着未发布的开发版本走 dev。 */
 function logs() {
   const appId = currentAppId();
   let environment = option('environment');
   if (!environment) {
-    const cloud = cloudStatus(cli(['diagnose', appId]).json);
-    environment = cloud?.prod ? 'prod' : 'dev';
+    const diagnosis = cli(['diagnose', appId]).json;
+    // 与本人窗口实际所在的数据域一致：新版 CLI 直接给出 data_domain；旧版按「有生产环境就看 prod」。
+    const cloud = cloudStatus(diagnosis);
+    environment = diagnosis?.data_domain?.expected ?? (cloud?.prod ? 'prod' : 'dev');
     log(`查看 ${environment} 环境（可用 -- --environment dev|prod 指定）`);
   }
   const args = ['runtime-logs', appId];
@@ -383,16 +456,115 @@ async function release() {
   if (out.unchanged) ok(`${label} 已经是线上版本`);
   else {
     ok(`已发布：线上版本为 v${out.version ?? state.version}。使用者下次打开自动更新，正在用的窗口会收到更新提示（24 小时后自动切换）。`);
-    console.log(
-      '  注意：你自己装的这个版本现在也是线上版本，重新打开窗口后改用正式数据域（全体使用者的真实数据）；开发期写入的数据留在调试域，不会搬过去，看起来像「数据没了」。' +
-        '\n  开发期数据可在「云开发控制台」→ 数据库切到开发环境查看；要继续在调试域测试，改完 npm run deploy 上传新的开发版本即可（装着未发布的开发版本时窗口自动用调试域）。',
-    );
+    if (needsCloud(manifest())) {
+      console.log(
+        '  注意：你自己装的这个版本现在也是线上版本，重新打开窗口后改用正式数据域（全体使用者的真实数据）；开发期写入的数据留在调试域，不会搬过去，看起来像「数据没了」。' +
+          '\n  开发期数据可在「云开发控制台」→ 数据库切到开发环境查看；要继续在调试域测试，改完 npm run deploy 上传新的开发版本即可（装着未发布的开发版本时窗口自动用调试域）。',
+      );
+    }
   }
+}
+
+/**
+ * 在浏览器打开 zleapOS 桌面并直接拉起本应用（本人已装的版本、本人身份），deploy 后自测用，不用发布上架。
+ * 新版 CLI 用 zleap-app open（会先核对是否已装）；旧版 CLI 没有这个命令时，按部署地址和 appid 自己拼链接。
+ */
+function openApp() {
+  const args = ['open'];
+  if (option('target')) args.push('--target', option('target'));
+  if (has('no-browser')) args.push('--no-browser');
+  const result = cli(args);
+  if (result.code === 0 && result.json?.url) {
+    const value = result.json;
+    if (value.status === 'opened') ok(`已在浏览器打开：${value.url}`);
+    else ok(`在已登录 zleapOS 的浏览器里打开：${value.url}`);
+    if (value.data_domain?.reason) console.log(`  ${value.data_domain.reason}`);
+    console.log('  浏览器里还没登录 zleapOS 时先登录，登录后自动打开应用；改代码后 npm run deploy，再在窗口里点「重新加载应用」。');
+    return;
+  }
+  if (!/未知命令|unknown command/i.test(`${result.stderr}${result.stdout}`)) {
+    if (needLogin(result.stderr)) throw new StepError('开发会话已过期或属于别的应用：先运行 npm run login');
+    throw new StepError(result.stderr || result.stdout.trim() || 'zleap-app open 失败');
+  }
+  const manifestValue = readJSON(manifestFile, {});
+  const appid = manifestValue?.appid || manifestValue?.app_key;
+  const target = option('target') || process.env.ZLEAP_TARGET || readJSON(configFile, {}).target;
+  if (!appid || !target) throw new StepError('还不知道要打开哪个应用或哪个 OS：先运行 npm run login 和 npm run deploy');
+  const url = `${String(target).replace(/\/+$/, '')}/?open_app=${encodeURIComponent(appid)}`;
+  if (!has('no-browser')) {
+    const opener = process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]];
+    const opened = spawnSync(opener[0], opener[1], { stdio: 'ignore' });
+    if (opened.status === 0) {
+      ok(`已在浏览器打开：${url}`);
+      return;
+    }
+  }
+  ok(`在已登录 zleapOS 的浏览器里打开：${url}`);
 }
 
 function passthrough(args) {
   const result = cli(args, { capture: false });
   if (result.code !== 0) process.exitCode = result.code;
+}
+
+/**
+ * 预览模式：不连 zleapOS，用页面里 preview 模块的示例数据把界面渲染出来，方便调样式、截图自查。
+ * 功能是否可用仍以部署后在 zleapOS 里打开为准。React 模板交给 Vite；vanilla 模板用内置静态服务。
+ */
+async function preview() {
+  const explicit = option('port') ?? process.env.PORT;
+  const port = explicit ? Number(explicit) : await freePort(5180, 20);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new StepError(`端口无效：${explicit}`);
+  if (explicit && !(await portFree(port))) {
+    throw new StepError(`端口 ${port} 已被占用：换一个（npm run preview -- --port ${port + 1}），或不写 --port 让脚本自动找空闲端口`);
+  }
+  if (!explicit && port !== 5180) log(`5180 已被占用，改用 ${port}`);
+  if (project.build) {
+    const vite = join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'vite.cmd' : 'vite');
+    if (!existsSync(vite)) throw new StepError('没有找到 vite，请先安装依赖（npm install）。');
+    const result = spawnSync(vite, ['--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, stdio: 'inherit', shell: process.platform === 'win32' });
+    process.exitCode = result.status ?? 1;
+    return;
+  }
+  syncSdk();
+  const base = resolve(root, packageDir);
+  const types = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
+  createServer((req, res) => {
+    const path = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname);
+    let file = normalize(join(base, path));
+    if (file !== base && !file.startsWith(base + sep)) {
+      res.writeHead(403).end();
+      return;
+    }
+    if (existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');
+    if (!existsSync(file)) {
+      res.writeHead(404).end('not found');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': `${types[extname(file).toLowerCase()] ?? 'application/octet-stream'}; charset=utf-8`, 'Cache-Control': 'no-store' });
+    res.end(readFileSync(file));
+  }).listen(port, '127.0.0.1', () => {
+    ok(`预览模式：http://127.0.0.1:${port}/`);
+    console.log('  页面不连 zleapOS，数据来自 preview.js 的示例；改完文件刷新即可。功能以 npm run deploy 后在 zleapOS 里打开为准。按 Ctrl+C 结束。');
+  });
+}
+
+/** 端口在 127.0.0.1 上是否空闲。 */
+function portFree(port) {
+  return new Promise((done) => {
+    const probe = createNetServer();
+    probe.once('error', () => done(false));
+    probe.once('listening', () => probe.close(() => done(true)));
+    probe.listen(port, '127.0.0.1');
+  });
+}
+
+/** 从 start 起找第一个空闲端口，最多试 count 个。 */
+async function freePort(start, count) {
+  for (let port = start; port < start + count; port += 1) {
+    if (await portFree(port)) return port;
+  }
+  throw new StepError(`${start}–${start + count - 1} 端口都被占用：用 npm run preview -- --port <端口> 指定一个空闲端口`);
 }
 
 async function main() {
@@ -409,8 +581,14 @@ async function main() {
       return versions();
     case 'release':
       return release();
+    case 'preview':
+      return preview();
+    case 'open':
+      return openApp();
+    case 'sdk':
+      return syncSdk();
     default:
-      console.log('用法：node scripts/zleap.mjs <login|deploy|status|logs|versions|release>');
+      console.log('用法：node scripts/zleap.mjs <login|deploy|open|status|logs|versions|release|preview|sdk>');
       process.exitCode = 1;
   }
 }

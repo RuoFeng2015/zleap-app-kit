@@ -3,18 +3,22 @@
 本项目是运行在 zleapOS 沙箱窗口里的云开发应用：React + Vite 构建到 `dist/`，`dist/` 就是应用包根目录。
 做任何云开发相关改动前，先读项目内 skill `zleap-cloud-app`（`.agents/skills/` 或 `.claude/skills/`）。
 
+**开发节奏**：一次只做一个功能。用户给了一组需求时先拆成能单独验收的小功能；每条改完先 `npm run preview` 看界面（新集合 / 新接口在 preview 模块补示例数据），再 `npm run typecheck && npm run check`、`npm run deploy`，用 `npm run open` 打开应用，请用户在 zleapOS 里验收（并回归之前的功能）通过后再做下一条。没有用户明确要求不发布。
+
 ## 命令
 
 | 目的 | 命令 |
 | --- | --- |
+| 预览界面（不连 zleapOS，示例数据来自 `src/cloud/preview.ts`；默认端口 5180，被占用时自动换下一个空闲端口，地址以终端输出为准） | `npm run preview` |
 | 类型检查 | `npm run typecheck` |
 | 构建 + 平台静态检查 | `npm run check`（`runtime_test=not_checked`，不代表能用） |
-| 登录 OS（浏览器授权，自动续期，最长 30 天） | `npm run login -- --target <OS 地址>` |
+| 登录 OS（浏览器授权，自动续期，最长 30 天；manifest 还没有 appid 时同时新建应用） | `npm run login -- --target <OS 地址>` |
 | 构建→检查→上传开发版本→装到本人 | `npm run deploy` |
+| 在浏览器打开 zleapOS 并直接拉起本人已装的应用（本人身份自测，不用发布；`-- --no-browser` 只打印链接） | `npm run open` |
 | 安装/权限/版本诊断 | `npm run status` |
 | 页面错误与云函数日志（24h） | `npm run logs`（`-- --environment dev\|prod`、`--invocation <调用编号>`） |
 | 版本列表（含线上版本） | `npm run versions` |
-| 发布为线上版本 / 回退（全企业生效） | `npm run release -- --notes "说明" --yes`（`--version-id <id>` 指定版本）——**只在用户明确要求发布时执行** |
+| 发布为线上版本 / 回退（全企业生效） | `npm run release -- --notes "说明" --yes`（`--version-id <id>` 指定版本）——**只在用户明确要求发布时执行**；发布后本人窗口也改用正式数据，开发期数据留在调试域（要继续用调试域测试就再 `npm run deploy` 一个开发版本） |
 
 `login` 需要用户在浏览器确认，**不要替用户输入密码或绕过**；会话过期时请用户重新运行 `npm run login`。
 
@@ -26,6 +30,6 @@
 - **只通过 `src/cloud/` 访问 SDK**；环境用 `DYNAMIC_CURRENT_ENV`，不要写死 dev/prod。SDK 是 npm 包 `@zleap-ai/app-sdk`（另有 `/host` 宿主能力、`/workspace` 工作区入口），API 以 `node_modules/@zleap-ai/app-sdk/dist/types/*.d.ts` 为准；SDK 与 `@zleap-ai/app-cli` 各自独立发版，升级时都装 `@latest` 即可。
 - **单次读取最多 100 条**，用 `skip` 翻页（skip ≤ 1000）。更新/删除带 `expectedVersion`。
 - **结果未知不重试**：`COMMIT_UNKNOWN` 时先重读核对；部署脚本退出码 6 同理。
-- **明确失败优于假成功**：不要用模拟数据、假登录或吞掉错误来让界面「看起来能用」。
+- **明确失败优于假成功**：在 zleapOS 里不要用模拟数据、假登录或吞掉错误来让界面「看起来能用」；示例数据只用于 `npm run preview` 的预览模式。新增集合或云函数时，在 `src/cloud/preview.ts` 补一份样例，预览才看得到。
 - **用户信息只走授权登录**：`zl.auth.authorize` 在按钮点击时调用，manifest `host_api.requires` 声明 `user.*`；用户键用 openid，不要找平台用户 ID。
 - 每次上传都要新版本号（`npm run deploy` 会在内容变化时自动递增补丁号）。

@@ -6,21 +6,29 @@
  * - 环境由宿主决定：永远用 DYNAMIC_CURRENT_ENV，不要写死 'dev' / 'prod'。
  * - 每次读最多 100 条，用 skip 翻页；写入结果未知（COMMIT_UNKNOWN）时先重读核对，不要自动重试。
  */
-import { AppError, CloudError, zl, type Capabilities } from '@zleap-ai/app-sdk';
+import { AppError, CloudError, zl as hostZl, type Capabilities } from '@zleap-ai/app-sdk';
 
-export { AppError, CloudError, zl };
+import { previewZl } from './preview';
+
+/**
+ * 应用其余代码用的 SDK 入口。浏览器直接打开（npm run preview）时换成 ./preview.ts 的内存实现；
+ * 在 zleapOS 窗口里永远是真实 SDK。
+ */
+export const zl: typeof hostZl = isStandalone() ? (previewZl as unknown as typeof hostZl) : hostZl;
+
+export { AppError, CloudError };
 export type { Capabilities };
 export type { Document } from '@zleap-ai/app-sdk';
 
 export type ConnectionState =
   | { status: 'connecting' }
   | { status: 'ready'; capabilities: Capabilities }
-  | { status: 'standalone' }
+  | { status: 'preview' }
   | { status: 'error'; code: string };
 
 let connection: Promise<Capabilities> | null = null;
 
-/** 浏览器直接打开（npm run dev）时没有宿主窗口，SDK 握手只会超时。 */
+/** 浏览器直接打开（npm run preview / dev）时没有宿主窗口：进入预览模式，用 ./preview.ts 的示例数据。 */
 export function isStandalone(): boolean {
   try {
     return window.parent === window;
@@ -57,10 +65,9 @@ export function errorCode(error: unknown): string {
 }
 
 /**
- * 面向用户的中文说明，只返回文案、不拼英文错误码；错误码另用 errorCode() 取（埋点、按码分支）。
+ * 面向用户的中文说明。未知错误码原样展示，方便对照文档「状态与错误码」。
  *
  * 宿主只把错误码（errCode）交给应用，不传服务端的中文说明，所以文案在这里按码维护。
- * 没列出的码给通用提示；对照文档「状态与错误码」排查时看 errorCode() 或 npm run logs。
  */
 export function describeError(error: unknown): string {
   const code = errorCode(error);
@@ -85,5 +92,5 @@ export function describeError(error: unknown): string {
     AUTH_GESTURE_REQUIRED: '请点按钮后再授权。',
     DOCUMENT_NOT_FOUND: '这条内容已经被删除了。',
   };
-  return hints[code] ?? '操作没有完成，请稍后重试。';
+  return hints[code] ? `${hints[code]}（${code}）` : code;
 }

@@ -44,6 +44,17 @@ import { zl, AppError } from '@zleap-ai/app-sdk';
 非成员一直开着的旧窗口，**从新线上版本发布起最多再用 24 小时**；到期宿主会强制切换并重新加载。这个截止时间就是
 `UpdateCheckResult.deadline`（毫秒时间戳）；应用成员、没有更新时为 `null`。
 
+### 当前用的是哪个数据域
+
+同一个应用的数据分**调试数据域**（`dev`）和**生产数据域**（`prod`）两套，互相隔离；用哪一套由宿主决定，应用代码一律写 `DYNAMIC_CURRENT_ENV`。
+要确认当前窗口用的是哪一套：点应用窗口顶部的「**权限**」，对话框顶部一行就是：
+
+- 「当前数据域：调试 —— 应用开发者调试用的数据，与正式使用的数据相互隔离。」
+- 「当前数据域：正式 —— 本应用全体使用者的数据，共享集合按规则对其他使用者可见。」
+
+应用成员装的是**还没发布的开发版本**时用调试数据域；装的版本**已发布为线上版本**后改用生产数据域（关掉窗口重新打开后生效），
+开发时写的数据留在调试数据域，不会带过去。普通使用者一律用生产数据域。完整规则见 核心概念 · 环境与数据域（文档站 /guide/concepts#环境-environment-与数据域）。
+
 ### `zl.app.getUpdateManager()`
 
 返回全局唯一的更新管理器（多次调用返回同一个）：
@@ -275,23 +286,41 @@ if (!scopes.includes('profile')) {
 - 撤销授权后页面 `getIdentity()` 仍返回 `openid`，但不再带之前同意的信息；云函数没有可读取授权信息的接口。
 - `getContext().userId` 是平台内部用户 ID，**已废弃**，新应用不要用它作为业务用户键。
 
+## 复制到剪贴板
+
+### `zl.app.setClipboardData({ data })`
+
+沙箱里 `navigator.clipboard` 与 `execCommand('copy')` 都不可用，由宿主窗口代写系统剪贴板。
+
+- Manifest `host_api.requires` 声明 `clipboard.write`（`host_api.profile` 为 `app-runtime/2`）；
+- 必须在用户点击 / 按键之后立即调用，否则 `CLIPBOARD_GESTURE_REQUIRED`；
+- `data` 是 1–32768 字的文本，可以含换行和制表符，不能含其他控制字符，否则 `SCHEMA_INVALID`；
+- 没声明 `clipboard.write` 时 `SCOPE_FORBIDDEN`；成功时 Promise resolve，没有返回值。只能写，不能读剪贴板。
+
+```ts
+button.addEventListener('click', () =>
+  zl.app.setClipboardData({ data: text }).then(() => toast('已复制')),
+);
+```
+
 ## 错误码
 
 `zl.app` / `zl.auth` 失败时抛出 `AppError`，用 `errCode` 分流（`message` 只用于调试）：
 
-| errCode                 | 含义                                                                             | 处理                                       |
-| ----------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
-| `AUTH_DENIED`           | 用户在授权框里点了「拒绝」                                                       | 按未授权处理，等用户主动操作时再申请       |
-| `AUTH_IN_PROGRESS`      | 授权框已经打开，又发起了一次 `authorize`                                         | 等上一次结果，不要并发调用                 |
-| `AUTH_GESTURE_REQUIRED` | 需要弹授权框，但调用不是紧跟在用户点击 / 按键之后                                | 放到按钮的点击事件里调用                   |
-| `AUTH_SCOPE_UNDECLARED` | 申请了 Manifest `host_api.requires` 没声明的 `user.*` 项                         | 补上声明，重新上传                         |
-| `SCHEMA_INVALID`        | `scopes` 为空或含 `profile` / `phone` / `email` 以外的值，或 `reason` 超过 60 字 | 改代码                                     |
-| `OPEN_IN_ZLEAP_OS`      | 不在 zleapOS 窗口里（例如浏览器直接打开、`npm run dev`）                         | 部署后从启动台打开                         |
-| `HOST_UNAVAILABLE`      | 宿主 15 秒内没有响应（宿主版本过旧）                                             | 升级 zleapOS 后重试                        |
-| `RUNTIME_UNAVAILABLE`   | 通道已关闭、窗口已不是当前实例，或平台接口暂不可用                               | 稍后重试；仍失败时重新打开应用             |
-| `CALL_TIMEOUT`          | 调用超时（一般 30 秒，`applyUpdate` 60 秒）                                      | 可以重试                                   |
-| `UPDATE_FAILED`         | `applyUpdate()` 切换失败（宿主报告的失败也可能是 `RUNTIME_UNAVAILABLE`）         | 提示用户重新打开应用，或到应用中心手动更新 |
-| `UNSUPPORTED_OPERATION` | 宿主不支持这个方法                                                               | 升级 zleapOS                               |
+| errCode                      | 含义                                                                             | 处理                                       |
+| ---------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------ |
+| `AUTH_DENIED`                | 用户在授权框里点了「拒绝」                                                       | 按未授权处理，等用户主动操作时再申请       |
+| `AUTH_IN_PROGRESS`           | 授权框已经打开，又发起了一次 `authorize`                                         | 等上一次结果，不要并发调用                 |
+| `AUTH_GESTURE_REQUIRED`      | 需要弹授权框，但调用不是紧跟在用户点击 / 按键之后                                | 放到按钮的点击事件里调用                   |
+| `CLIPBOARD_GESTURE_REQUIRED` | `setClipboardData` 不是紧跟在用户点击 / 按键之后                                 | 放到按钮的点击事件里调用                   |
+| `AUTH_SCOPE_UNDECLARED`      | 申请了 Manifest `host_api.requires` 没声明的 `user.*` 项                         | 补上声明，重新上传                         |
+| `SCHEMA_INVALID`             | `scopes` 为空或含 `profile` / `phone` / `email` 以外的值，或 `reason` 超过 60 字 | 改代码                                     |
+| `OPEN_IN_ZLEAP_OS`           | 不在 zleapOS 窗口里（例如浏览器直接打开、`npm run dev`）                         | 部署后从启动台打开                         |
+| `HOST_UNAVAILABLE`           | 宿主 15 秒内没有响应（宿主版本过旧）                                             | 升级 zleapOS 后重试                        |
+| `RUNTIME_UNAVAILABLE`        | 通道已关闭、窗口已不是当前实例，或平台接口暂不可用                               | 稍后重试；仍失败时重新打开应用             |
+| `CALL_TIMEOUT`               | 调用超时（一般 30 秒，`applyUpdate` 60 秒）                                      | 可以重试                                   |
+| `UPDATE_FAILED`              | `applyUpdate()` 切换失败（宿主报告的失败也可能是 `RUNTIME_UNAVAILABLE`）         | 提示用户重新打开应用，或到应用中心手动更新 |
+| `UNSUPPORTED_OPERATION`      | 宿主不支持这个方法                                                               | 升级 zleapOS                               |
 
 ## 平台接口（供参考）
 

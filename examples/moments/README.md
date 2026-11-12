@@ -14,9 +14,10 @@
 
 ```bash
 npm install
+npm run preview                # 不连 zleapOS，用示例数据在浏览器里看界面（先改界面时用）
 npm run login -- --target https://<你的 zleapOS>
 npm run deploy                 # 构建 → 检查 → 上传开发版本 → 装到自己桌面
 npm run release -- --notes "…" # 发布为线上版本（全企业可见）
 ```
 
-manifest 里的 `appid` 换成你在云开发控制台「创建应用」拿到的。
+manifest 里的 `appid` 是示例作者的应用：删掉 `appid` 后第一次 `npm run login` 会在授权时新建成你自己的应用并写回 `manifest.json`，或换成你在云开发控制台「创建应用」拿到的。部署后 `npm run open` 用本人身份直接打开测试。

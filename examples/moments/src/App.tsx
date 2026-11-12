@@ -51,11 +51,12 @@ export function App() {
         </div>
         <UpdateBanner />
       </header>
-      {state.status === 'standalone' ? (
-        <Notice tone="info" title="当前是浏览器独立预览">
-          运行 <code>npm run deploy</code> 后从 zleapOS 启动台打开，才能看到同事们的动态。
+      {state.status === 'preview' ? (
+        <Notice tone="info" title="预览模式 · 示例数据">
+          没有连接 zleapOS，改动不会保存，刷新后恢复原样。运行 <code>npm run deploy</code> 后从 zleapOS 启动台打开才是真实数据。
         </Notice>
       ) : null}
+      {state.status === 'preview' ? <Moments storage /> : null}
       {state.status === 'connecting' ? <p className="muted">正在连接 zleapOS…</p> : null}
       {state.status === 'error' ? (
         <Notice tone="bad" title="连接 zleapOS 失败" action={<button onClick={retry}>重试</button>}>

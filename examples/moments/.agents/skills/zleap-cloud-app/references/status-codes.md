@@ -72,14 +72,14 @@
 
 宿主按下面的白名单把 `reason` 原样转给应用：
 
-| 分组       | 原样透传的码                                                                                                                                                                             |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 认证与权限 | `AUTH_REQUIRED`、`ENV_FORBIDDEN`、`PUBLISHER_REQUIRED`、`SCOPE_FORBIDDEN`、`RULE_DENIED`、`QUERY_NOT_AUTHORIZED`                                                                         |
-| 数据       | `COLLECTION_NOT_FOUND`、`DOCUMENT_NOT_FOUND`、`SCHEMA_INVALID`、`UNSUPPORTED_OPERATION`、`VERSION_CONFLICT`、`IDEMPOTENCY_CONFLICT`、`INDEX_REQUIRED`                                    |
-| 繁忙与超限 | `RESOURCE_EXHAUSTED`、`APP_RATE_LIMITED`                                                                                                                                                 |
-| 结果与通道 | `RUNTIME_UNAVAILABLE`、`CALL_TIMEOUT`、`COMMIT_UNKNOWN`、`NODE_LOST`、`NODE_LOST_EXPIRED`、`OPERATION_EXPIRED`、`STALE_GENERATION`、`PROTOCOL_MISMATCH`                                  |
-| 文件       | `STALE_RESOURCE`、`FILE_NOT_FOUND`、`STORAGE_UNAVAILABLE`                                                                                                                                |
-| 就绪与发布 | `RESOURCE_NOT_READY`、`FUNCTION_RELEASE_REQUIRED`、`RELEASE_UNAVAILABLE`、`RELEASE_NOT_READY`、`RELEASE_DISABLED`、`RELEASE_ACTIVATION_UNAVAILABLE`、`RELEASE_ACTIVATION_TARGET_MISSING` |
+| 分组       | 原样透传的码                                                                                                                                                                                                                                                                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 认证与权限 | `AUTH_REQUIRED`、`ENV_FORBIDDEN`、`PUBLISHER_REQUIRED`、`SCOPE_FORBIDDEN`、`RULE_DENIED`、`QUERY_NOT_AUTHORIZED`                                                                                                                                                                                                                                     |
+| 数据       | `COLLECTION_NOT_FOUND`、`DOCUMENT_NOT_FOUND`、`SCHEMA_INVALID`、`UNSUPPORTED_OPERATION`、`VERSION_CONFLICT`、`IDEMPOTENCY_CONFLICT`、`INDEX_REQUIRED`                                                                                                                                                                                                |
+| 繁忙与超限 | `RESOURCE_EXHAUSTED`、`APP_RATE_LIMITED`                                                                                                                                                                                                                                                                                                             |
+| 结果与通道 | `RUNTIME_UNAVAILABLE`、`CALL_TIMEOUT`、`COMMIT_UNKNOWN`、`NODE_LOST`、`NODE_LOST_EXPIRED`、`OPERATION_EXPIRED`、`STALE_GENERATION`、`PROTOCOL_MISMATCH`                                                                                                                                                                                              |
+| 文件       | `STALE_RESOURCE`、`FILE_NOT_FOUND`、`STORAGE_UNAVAILABLE`                                                                                                                                                                                                                                                                                            |
+| 就绪与发布 | `RESOURCE_NOT_READY`、`FUNCTION_RELEASE_REQUIRED`、`RELEASE_UNAVAILABLE`、`RELEASE_NOT_READY`、`RELEASE_DISABLED`、`RELEASE_ACTIVATION_UNAVAILABLE`、`RELEASE_ACTIVATION_TARGET_MISSING`、`ACTIVATION_STALE`、`ACTIVATION_RELEASE_MISMATCH`、`CAPABILITY_REVOKED`、`CAPABILITY_NOT_DECLARED`、`CAPABILITY_NOT_AUTHORIZED`、`MAINTENANCE_IN_PROGRESS` |
 
 不在白名单里的码按业务码段位归类：
 
@@ -112,55 +112,57 @@
 
 ### 通道与调用
 
-| 错误码                              | 含义                                                                              | 可重试 | 处理                                                                                                                                        |
-| ----------------------------------- | --------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `COMMIT_UNKNOWN`                    | **写操作结果未知**（写请求 30 秒未返回等）                                        | ✅     | **用原 `operationId` 查回执**，确认前不要换编号重新写                                                                                       |
-| `CALL_TIMEOUT`                      | 读请求 30 秒未返回 / 握手 15 秒未完成 / 作业等待超时                              | ✅     | 可重试；带 `jobId` 时用 `jobs.wait` 继续等                                                                                                  |
-| `RUNTIME_UNAVAILABLE`               | 通道已关闭或服务暂不可用                                                          | ✅     | 稍后重试；页面卸载后通道不可再用                                                                                                            |
-| `APP_RATE_LIMITED`                  | 本应用此刻并发请求过多（单应用并发槽被占满）                                      | ❌\*   | 稍后重试；不要立刻循环重试                                                                                                                  |
-| `RESOURCE_EXHAUSTED`                | 超出限制（并发 >8、分页/排序/大小上限、配额）                                     | —      | 对照 [限制](limits.md) 调整；配额类需清理数据                                                                                                |
-| `REQUEST_TOO_LARGE`                 | 请求体超过协商上限（默认 256 KiB）                                                | ❌     | 拆分请求                                                                                                                                    |
-| `IDEMPOTENCY_CONFLICT`              | 同一请求编号被重复使用，或同一操作编号用于不同内容                                | ❌     | 新请求用新编号；重试同一写入时内容必须完全相同                                                                                              |
-| `OPERATION_EXPIRED`                 | 操作编号超出首次使用窗口（300 秒）或回执已过期                                    | ❌     | 重新读取最新状态后，用新编号发起                                                                                                            |
-| `PROTOCOL_MISMATCH`                 | SDK 与宿主协议不一致，或响应结构异常                                              | ❌     | 使用与当前 OS 匹配的 SDK 版本                                                                                                               |
-| `BACKGROUND_CAPABILITY_UNAVAILABLE` | 宿主没有协商到 `app-execution/1`，`callFunction` / `capabilities.invoke` 无法执行 | ❌     | 先让使用者在应用窗口「权限」里勾选后台能力并保存；确认安装已绑定就绪发布、部署开放后台执行。旧 SDK 报的是 `UNSUPPORTED_OPERATION`，升级 SDK |
-| `UNSUPPORTED_OPERATION`             | 平台未实现或未协商的操作                                                          | ❌     | 改实现，见 [未实现的 SDK 功能](limits.md#未实现的-sdk-功能)                                                                                  |
+| 错误码                              | 含义                                                                                                        | 可重试 | 处理                                                                                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `COMMIT_UNKNOWN`                    | **写操作结果未知**（写请求 30 秒未返回等）                                                                  | ✅     | **用原 `operationId` 查回执**，确认前不要换编号重新写                                                                                       |
+| `CALL_TIMEOUT`                      | 读请求 30 秒未返回 / 握手 15 秒未完成 / 作业等待超时                                                        | ✅     | 可重试；带 `jobId` 时用 `jobs.wait` 继续等                                                                                                  |
+| `RUNTIME_UNAVAILABLE`               | 通道已关闭或服务暂不可用                                                                                    | ✅     | 稍后重试；页面卸载后通道不可再用                                                                                                            |
+| `APP_RATE_LIMITED`                  | 请求太快：单应用并发槽被占满，或本人一分钟内的数据请求超过频率上限                                          | ❌\*   | 稍后重试；不要立刻循环重试                                                                                                                  |
+| `RESOURCE_EXHAUSTED`                | 超出限制（同一窗口在途请求 >8、数据配额）；单文档 >256 KiB、单文件 >4 MiB 这类大小超限归为 `SCHEMA_INVALID` | —      | 对照 [限制](limits.md) 调整：在途过多就限制并发，配额类需清理数据                                                                            |
+| `REQUEST_TOO_LARGE`                 | 请求体超过协商上限（默认 256 KiB）                                                                          | ❌     | 拆分请求                                                                                                                                    |
+| `IDEMPOTENCY_CONFLICT`              | 同一请求编号被重复使用，或同一操作编号用于不同内容                                                          | ❌     | 新请求用新编号；重试同一写入时内容必须完全相同                                                                                              |
+| `OPERATION_EXPIRED`                 | 操作编号超出首次使用窗口（300 秒）或回执已过期                                                              | ❌     | 重新读取最新状态后，用新编号发起                                                                                                            |
+| `PROTOCOL_MISMATCH`                 | SDK 与宿主协议不一致，或响应结构异常                                                                        | ❌     | 使用与当前 OS 匹配的 SDK 版本                                                                                                               |
+| `BACKGROUND_CAPABILITY_UNAVAILABLE` | 宿主没有协商到 `app-execution/1`，`callFunction` / `capabilities.invoke` 无法执行                           | ❌     | 先让使用者在应用窗口「权限」里勾选后台能力并保存；确认安装已绑定就绪发布、部署开放后台执行。旧 SDK 报的是 `UNSUPPORTED_OPERATION`，升级 SDK |
+| `UNSUPPORTED_OPERATION`             | 平台未实现或未协商的操作                                                                                    | ❌     | 改实现，见 [未实现的 SDK 功能](limits.md#未实现的-sdk-功能)                                                                                  |
 
 \* `retryable` 为 `false`，但稍等后重试通常能成功；持续出现说明有长任务占满了并发。
 
 ### 初始化与授权
 
-| 错误码                 | 含义                                                         | 处理                                                                   |
-| ---------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| `INIT_REQUIRED`        | 调用 `ready()` 前没有 `zl.cloud.init()`                      | 先初始化                                                               |
-| `INIT_CONFLICT`        | 同一页面用不同环境再次初始化                                 | 一个页面只绑定一个环境                                                 |
-| `ENV_MISMATCH`         | `env` 取值非法                                               | 只能是 `dev` / `prod`（或 `DYNAMIC_CURRENT_ENV`）                      |
-| `AUTH_REQUIRED`        | 登录态或运行会话失效                                         | 重新打开应用                                                           |
-| `SCOPE_FORBIDDEN`      | 权限范围不允许（含未授权数据访问、生产文件存储未开放）       | 见本页末尾「排查：`SCOPE_FORBIDDEN`」                                  |
-| `ENV_FORBIDDEN`        | 应用要用的环境不存在或已停用                                 | 见下方「打开应用时的错误」                                             |
-| `PUBLISHER_REQUIRED`   | 开发数据域只对应用成员开放                                   | 请管理员在控制台「成员」里把你加为开发者；给其他人用需要发布为线上版本 |
-| `STALE_GENERATION`     | 授权或数据绑定已换代（如重新授权、恢复备份）                 | 重新打开应用，建立新会话                                               |
-| `RULE_DENIED`          | 集合记录规则拒绝了本次读/写                                  | 检查 `data.policies` 的 `read`/`write` 表达式与文档内容                |
-| `QUERY_NOT_AUTHORIZED` | 查询不在授权范围内（宿主白名单中的码，服务端来源**未验证**） | 检查查询条件与授权                                                     |
+| 错误码                 | 含义                                                                                                                                               | 处理                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `INIT_REQUIRED`        | 调用 `ready()` 前没有 `zl.cloud.init()`                                                                                                            | 先初始化                                                               |
+| `INIT_CONFLICT`        | 同一页面用不同环境再次初始化                                                                                                                       | 一个页面只绑定一个环境                                                 |
+| `ENV_MISMATCH`         | `env` 取值非法                                                                                                                                     | 只能是 `dev` / `prod`（或 `DYNAMIC_CURRENT_ENV`）                      |
+| `AUTH_REQUIRED`        | 登录态或运行会话失效                                                                                                                               | 重新打开应用                                                           |
+| `SCOPE_FORBIDDEN`      | 权限范围不允许（含未授权数据访问、生产文件存储未开放）                                                                                             | 见本页末尾「排查：`SCOPE_FORBIDDEN`」                                  |
+| `ENV_FORBIDDEN`        | 应用要用的环境不存在或已停用                                                                                                                       | 见下方「打开应用时的错误」                                             |
+| `PUBLISHER_REQUIRED`   | 开发数据域只对应用成员开放                                                                                                                         | 请管理员在控制台「成员」里把你加为开发者；给其他人用需要发布为线上版本 |
+| `STALE_GENERATION`     | 授权或数据绑定已换代（如重新授权、恢复备份）                                                                                                       | 重新打开应用，建立新会话                                               |
+| `RULE_DENIED`          | 集合记录规则拒绝了本次读/写（新增的文档内容不满足 `write` 规则；改 / 删**已有**文档时，规则不允许的文档按「看不到」处理，报 `DOCUMENT_NOT_FOUND`） | 检查 `data.policies` 的 `read`/`write` 表达式与文档内容                |
+| `QUERY_NOT_AUTHORIZED` | 查询不在授权范围内（宿主白名单中的码，服务端来源**未验证**）                                                                                       | 检查查询条件与授权                                                     |
 
 ### 数据
 
-| 错误码                 | 含义                                       | 处理                                                        |
-| ---------------------- | ------------------------------------------ | ----------------------------------------------------------- |
-| `SCHEMA_INVALID`       | 参数或文档不符合规则（含大小、嵌套等超限） | 见本页末尾「排查：`SCHEMA_INVALID`」                        |
-| `VERSION_CONFLICT`     | 乐观锁冲突，或键已存在等 409 类错误        | 重新读取最新版本再改                                        |
-| `DOCUMENT_NOT_FOUND`   | 文档不存在（或 404 类错误）                | 检查文档键；读取时可用 `throwOnNotFound: false`             |
-| `COLLECTION_NOT_FOUND` | 集合不存在                                 | 在 Manifest `data.collections` 声明；生产环境要单独开通集合 |
-| `INDEX_REQUIRED`       | 查询需要扫描的行数超过单次上限             | 给筛选字段建索引；已有索引仍超限时缩小筛选范围              |
-| `RESOURCE_NOT_READY`   | 云数据库正在开通，或数据服务还没加载本应用 | 通常一分钟内自动就绪，稍后刷新重试                          |
+| 错误码                 | 含义                                         | 处理                                                                             |
+| ---------------------- | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `SCHEMA_INVALID`       | 参数或文档不符合规则（含大小、嵌套等超限）   | 见本页末尾「排查：`SCHEMA_INVALID`」                                             |
+| `VERSION_CONFLICT`     | 乐观锁冲突，或键已存在等 409 类错误          | 重新读取最新版本再改                                                             |
+| `DOCUMENT_NOT_FOUND`   | 文档不存在（或 404 类错误）                  | 检查文档键；读取时可用 `throwOnNotFound: false`                                  |
+| `COLLECTION_NOT_FOUND` | 集合不存在                                   | 在 Manifest `data.collections` 声明；生产环境要单独开通集合                      |
+| `SCOPE_FORBIDDEN`      | 读写了 manifest **没声明**的集合（或没授权） | 先在 `data.collections` 声明再部署；已声明还报这个，看「权限」里是否勾了数据读写 |
+| `INDEX_REQUIRED`       | 查询需要扫描的行数超过单次上限               | 给筛选字段建索引；已有索引仍超限时缩小筛选范围                                   |
+| `RESOURCE_NOT_READY`   | 云数据库正在开通，或数据服务还没加载本应用   | 通常一分钟内自动就绪，稍后刷新重试                                               |
 
 ### 文件存储
 
-| 错误码                | 含义                      | 处理                               |
-| --------------------- | ------------------------- | ---------------------------------- |
-| `FILE_NOT_FOUND`      | 文件不存在或已删除        | 检查 `fileID`                      |
-| `STALE_RESOURCE`      | 条件覆盖/删除时文件已变化 | 重新 `stat` 拿到最新 etag 后再操作 |
-| `STORAGE_UNAVAILABLE` | 存储服务不可用            | 稍后重试                           |
+| 错误码                    | 含义                              | 处理                                               |
+| ------------------------- | --------------------------------- | -------------------------------------------------- |
+| `FILE_NOT_FOUND`          | 文件不存在或已删除                | 检查 `fileID`                                      |
+| `STALE_RESOURCE`          | 条件覆盖/删除时文件已变化         | 重新 `stat` 拿到最新 etag 后再操作                 |
+| `STORAGE_UNAVAILABLE`     | 存储服务不可用                    | 稍后重试                                           |
+| `MAINTENANCE_IN_PROGRESS` | 数据正在备份 / 恢复，暂时冻结读写 | 提示用户「数据维护中」，稍后重试；不要当成数据丢失 |
 
 ### 发布与后台调用
 
@@ -171,6 +173,11 @@
 | `RELEASE_NOT_READY`                 | 发布候选尚未就绪                                   | 重新发布，平台会重新签发                                                                                                                                                                      |
 | `RELEASE_DISABLED`                  | 发布候选已撤回                                     | 重新上传并发布                                                                                                                                                                                |
 | `RELEASE_ACTIVATION_UNAVAILABLE`    | 目标环境不存在且无法自动创建                       | 通常是部署未开放对应环境；请联系平台管理员                                                                                                                                                    |
+| `ACTIVATION_STALE`                  | 后台能力的授权停用了，或固定的版本 / 环境已变化    | 在应用窗口「权限」里重新允许该后台能力                                                                                                                                                        |
+| `ACTIVATION_RELEASE_MISMATCH`       | 后台能力绑定的发布与安装当前的发布不一致           | 在应用窗口「权限」里重新保存一次，平台会把各环境的后台能力改绑到当前发布                                                                                                                      |
+| `CAPABILITY_REVOKED`                | 后台能力的授权已被撤销                             | 在应用窗口「权限」里重新允许                                                                                                                                                                  |
+| `CAPABILITY_NOT_DECLARED`           | 当前版本的 manifest 已不再声明这个后台能力         | 检查 `runtime.capabilities.provides`；如果是有意去掉，应用里不要再调用它                                                                                                                      |
+| `CAPABILITY_NOT_AUTHORIZED`         | 用户还没有允许这个后台能力                         | 引导用户在应用窗口「权限」里勾选后台运行                                                                                                                                                      |
 | `RELEASE_ACTIVATION_TARGET_MISSING` | 激活目标与校验后的 Manifest 不一致（少见）         | 重新上传并安装该版本                                                                                                                                                                          |
 | `NODE_LOST`                         | 执行节点失联，**结果未确认**（作业状态 `unknown`） | 不要重复提交；用 `jobId` / `invocationId` 核对                                                                                                                                                |
 | `NODE_LOST_EXPIRED`                 | 节点失联且超过对账期限                             | 到控制台运行记录核对是否已产生写入，再决定是否重新提交                                                                                                                                        |
@@ -185,19 +192,21 @@
 `zl.app`（更新管理器）和 `zl.auth`（授权登录）失败时抛出的是 `AppError`（不是 `CloudError`），只有 `errCode` 和 `message`。
 详见 [版本更新与授权登录](app-runtime.md#错误码)。
 
-| errCode                 | 含义                                                     | 处理                                 |
-| ----------------------- | -------------------------------------------------------- | ------------------------------------ |
-| `AUTH_DENIED`           | 用户在系统授权框里点了「拒绝」，或 24 小时内拒绝过这些项 | 按未授权处理，等用户主动操作时再申请 |
-| `AUTH_IN_PROGRESS`      | 授权框已打开，又发起了一次 `authorize`                   | 等上一次结果                         |
-| `AUTH_GESTURE_REQUIRED` | 需要弹授权框，但不是在用户点击 / 按键之后调用            | 放到按钮点击事件里调用               |
-| `AUTH_SCOPE_UNDECLARED` | 申请了 Manifest `host_api.requires` 没声明的 `user.*`    | 补上声明，重新上传                   |
-| `SCHEMA_INVALID`        | `scopes` 为空或含其他值，或 `reason` 超过 60 字          | 改代码                               |
-| `OPEN_IN_ZLEAP_OS`      | 不在 zleapOS 窗口里打开                                  | 部署后从启动台打开                   |
-| `HOST_UNAVAILABLE`      | 宿主 15 秒内没有响应                                     | 升级 zleapOS 后重试                  |
-| `RUNTIME_UNAVAILABLE`   | 通道已关闭或平台接口暂不可用                             | 稍后重试；仍失败时重新打开应用       |
-| `CALL_TIMEOUT`          | 调用超时                                                 | 可以重试                             |
-| `UPDATE_FAILED`         | `applyUpdate()` 切换失败                                 | 提示用户重新打开应用或到应用中心更新 |
-| `UNSUPPORTED_OPERATION` | 宿主不支持这个方法                                       | 升级 zleapOS                         |
+| errCode                      | 含义                                                               | 处理                                 |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------------ |
+| `AUTH_DENIED`                | 用户在系统授权框里点了「拒绝」，或 24 小时内拒绝过这些项           | 按未授权处理，等用户主动操作时再申请 |
+| `AUTH_IN_PROGRESS`           | 授权框已打开，又发起了一次 `authorize`                             | 等上一次结果                         |
+| `AUTH_GESTURE_REQUIRED`      | 需要弹授权框，但不是在用户点击 / 按键之后调用                      | 放到按钮点击事件里调用               |
+| `AUTH_SCOPE_UNDECLARED`      | 申请了 Manifest `host_api.requires` 没声明的 `user.*`              | 补上声明，重新上传                   |
+| `CLIPBOARD_GESTURE_REQUIRED` | `zl.app.setClipboardData` 不是在用户点击 / 按键之后调用            | 放到按钮点击事件里调用               |
+| `SCOPE_FORBIDDEN`            | `setClipboardData` 时 `host_api.requires` 没声明 `clipboard.write` | 补上声明，重新上传                   |
+| `SCHEMA_INVALID`             | `scopes` 为空或含其他值，或 `reason` 超过 60 字                    | 改代码                               |
+| `OPEN_IN_ZLEAP_OS`           | 不在 zleapOS 窗口里打开                                            | 部署后从启动台打开                   |
+| `HOST_UNAVAILABLE`           | 宿主 15 秒内没有响应                                               | 升级 zleapOS 后重试                  |
+| `RUNTIME_UNAVAILABLE`        | 通道已关闭或平台接口暂不可用                                       | 稍后重试；仍失败时重新打开应用       |
+| `CALL_TIMEOUT`               | 调用超时                                                           | 可以重试                             |
+| `UPDATE_FAILED`              | `applyUpdate()` 切换失败                                           | 提示用户重新打开应用或到应用中心更新 |
+| `UNSUPPORTED_OPERATION`      | 宿主不支持这个方法                                                 | 升级 zleapOS                         |
 
 ## 打开应用时的错误
 
@@ -332,6 +341,7 @@
 | errorCode                                                                                                                            | 含义                                       |
 | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
 | `USER_EXCEPTION`                                                                                                                     | 函数抛出了未捕获的异常                     |
+| `DEADLINE_EXCEEDED`                                                                                                                  | 云函数超过 `timeout_seconds` 仍未返回      |
 | `NODE_LOST`                                                                                                                          | 执行节点失联，结果未确认（状态 `unknown`） |
 | `NODE_LOST_EXPIRED`                                                                                                                  | 失联且超过对账期限                         |
 | `WORKER_INTERRUPTED`                                                                                                                 | 执行被中断                                 |
@@ -418,18 +428,25 @@
 `zleap-app publish` 等写操作网络结果不明时返回 `COMMIT_UNKNOWN`，**不会自动重传**：
 用 `zleap-app operation --request-id <原操作号>` 或 `zleap-app status` 查询原结果。
 
+`zleap-app business get` / `call`（以及 MCP 的 `os_business_get` / `os_business_call`）请求超管、账号与组织、内部控制或未审核的接口时，
+返回 403 `OPERATION_NOT_EXPOSED`。应用页面直接调用 OS 接口时，未向应用开放的接口同样返回 `OPERATION_NOT_EXPOSED`（「该接口未向应用开放」）。
+这类接口不会开放，先用 `business search` 找可用的替代接口。
+
 ## 上传与 Manifest 校验
 
 上传、`zleap-app check` 或安装时，Manifest 相关失败通过 `detail.reason` 返回：
 
-| 原因                    | 含义                                                         | 处理                                                           |
-| ----------------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |
-| `MANIFEST_UNSUPPORTED`  | `schema` 不是 `zleap.app/2`、结构/引用/执行形态无效          | 对照 [Manifest](manifest.md) 逐字段核对                         |
-| `SCHEMA_INVALID`        | 集合 Schema 不符合数据面契约（`detail.collection` 指出集合） | 只用集合 Schema 子集                                           |
-| `RULE_DENIED`           | 集合记录规则表达式无效                                       | 修正表达式                                                     |
-| `RULE_FIELD_UNDECLARED` | 记录规则引用了 Schema 未声明的字段                           | 在 Schema 顶层声明该字段                                       |
-| `RUNTIME_UNAVAILABLE`   | 运行环境未开放（`builtin` UI、纯后台带函数等）               | 见 [不可安装的配置](limits.md#已知会导致「应用不可安装」的配置) |
-| `FEATURE_UNAVAILABLE`   | 声明了未开放的能力或写法                                     | 同上                                                           |
+| 原因                                                                                  | 含义                                                                                                   | 处理                                                                                                   |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `MANIFEST_UNSUPPORTED`                                                                | `schema` 不是 `zleap.app/2`、结构/引用/执行形态无效                                                    | 对照 [Manifest](manifest.md) 逐字段核对                                                                 |
+| `SCHEMA_INVALID`                                                                      | 集合 Schema 不符合数据面契约（`detail.collection` 指出集合）                                           | 只用集合 Schema 子集                                                                                   |
+| `RULE_DENIED`                                                                         | 集合记录规则表达式无效                                                                                 | 修正表达式                                                                                             |
+| `RULE_FIELD_UNDECLARED`                                                               | 记录规则引用了 Schema 未声明的字段                                                                     | 在 Schema 顶层声明该字段                                                                               |
+| `RUNTIME_UNAVAILABLE`                                                                 | 运行环境未开放（`builtin` UI、纯后台带函数等）                                                         | 见 [不可安装的配置](limits.md#已知会导致「应用不可安装」的配置)                                         |
+| `FEATURE_UNAVAILABLE`                                                                 | 声明了未开放的能力或写法                                                                               | 同上                                                                                                   |
+| `VERSION_EXISTS`                                                                      | 同版本号、内容不同（40900）                                                                            | 改 `version`；`npm run deploy` 自动递增补丁号                                                          |
+| `VERSION_NOT_INCREASING`                                                              | 平台 appid 应用的新版本号不高于已上传的版本（40900，`detail.latest_version` 给出最高版本）             | 把 `version` 改成更高的号；`npm run deploy` 自动处理（旧项目先 `npx create-zleap-app@latest scripts`） |
+| `TRIGGER_SCHEDULE_INVALID` / `TRIGGER_CAPABILITY_NOT_PROVIDED` / `EVENT_NOT_DECLARED` | 触发器的 cron / 时区无效、调用的能力不在 `provides` 里、监听的事件不在 `events.subscribes` 里（42200） | 按 `next_action` 修正触发器声明                                                                        |
 
 常见的上传失败文案（没有原因码，直接看提示）：
 
@@ -523,18 +540,18 @@
 平台在上传带后台能力的版本时自动签发开发发布，首次发布为线上版本时自动签发生产发布。
 签发或验签失败时按原因码归类返回：
 
-| 服务端原因码                                                                      | 含义                                                                     |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `RELEASE_PROOF_TOO_LARGE`                                                         | 证明文件超过 2 MiB 限制                                                  |
-| `RELEASE_PROOF_INVALID`                                                           | 证明 JSON 或签名信封无效                                                 |
-| `RELEASE_IDENTITY_MISMATCH`、`RELEASE_DIGEST_MISMATCH`、`RELEASE_SOURCE_MISMATCH` | 证明与当前应用、发布、包、来源、摘要或策略不匹配                         |
-| `RELEASE_SIGNATURE_INVALID`                                                       | 无法验证发布签名                                                         |
-| `RELEASE_ARTIFACT_MISMATCH`、`RELEASE_MANIFEST_MISMATCH`                          | 签名 Manifest 或包制品清单不匹配                                         |
-| `RELEASE_POLICY_STALE`                                                            | 策略审核已过期或不是当前策略                                             |
-| `RELEASE_POLICY_UNAVAILABLE`                                                      | 尚未配置发布策略，无法验证                                               |
-| `RELEASE_TRUST_UNAVAILABLE`                                                       | 发布信任策略尚未配置，或发布者密钥不可用、已撤销或已过期；由管理员检查   |
-| `RELEASE_DISABLED`                                                                | 发布候选已撤回                                                           |
-| 其他                                                                              | 签名验证请求被拒绝                                                       |
+| 服务端原因码                                                                      | 含义                                                                   |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `RELEASE_PROOF_TOO_LARGE`                                                         | 证明文件超过 2 MiB 限制                                                |
+| `RELEASE_PROOF_INVALID`                                                           | 证明 JSON 或签名信封无效                                               |
+| `RELEASE_IDENTITY_MISMATCH`、`RELEASE_DIGEST_MISMATCH`、`RELEASE_SOURCE_MISMATCH` | 证明与当前应用、发布、包、来源、摘要或策略不匹配                       |
+| `RELEASE_SIGNATURE_INVALID`                                                       | 无法验证发布签名                                                       |
+| `RELEASE_ARTIFACT_MISMATCH`、`RELEASE_MANIFEST_MISMATCH`                          | 签名 Manifest 或包制品清单不匹配                                       |
+| `RELEASE_POLICY_STALE`                                                            | 策略审核已过期或不是当前策略                                           |
+| `RELEASE_POLICY_UNAVAILABLE`                                                      | 尚未配置发布策略，无法验证                                             |
+| `RELEASE_TRUST_UNAVAILABLE`                                                       | 发布信任策略尚未配置，或发布者密钥不可用、已撤销或已过期；由管理员检查 |
+| `RELEASE_DISABLED`                                                                | 发布候选已撤回                                                         |
+| 其他                                                                              | 签名验证请求被拒绝                                                     |
 
 签发时的 `RELEASE_POLICY_UNAVAILABLE`、`RELEASE_TRUST_UNAVAILABLE` 属于**部署未配置**；
 发布生产版本时的 `RELEASE_TRUST_UNAVAILABLE` 则表示这个发布的签名与当前信任策略对不上，重新发布即可（见 [发布与生产门禁](#发布与生产门禁)）。
