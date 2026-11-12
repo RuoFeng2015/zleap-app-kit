@@ -1,30 +1,30 @@
 {
   "darwin": {
     "file": "bin/zleap-app",
-    "sha256": "8cd54c1ffe5a4011d40cce74c5c2a47b3394414ca58e04357c4a6afd47b0f53b",
+    "sha256": "859b2851cb7cb981ff2504eba84c9fb6c60df80ccea2988b73e059f0dbc0ddd6",
     "commit": "657379af",
-    "source": "71b1151d964d9bd79ac7e301dfeb73517d6c65c52775e6802ed6814d7803879e",
+    "source": "bb2dcd2196f8c527c5855d959fa5233b6eef5981a1b402241477ea8e2d8bb5bb",
     "sdk": "f4053245038d65dd3daac0194fa4fb40130b4882da6c41322264eaba0d61ee48"
   },
   "linux-x64": {
     "file": "bin/zleap-app",
-    "sha256": "e67a27bf87efca15078f23dc1f715f8b6b770769e541b213dc2a0d75248486e8",
+    "sha256": "4f3a329de3e61491bd295e14779cb5c58b34fd956d0a87a9f06634501dad5599",
     "commit": "657379af",
-    "source": "71b1151d964d9bd79ac7e301dfeb73517d6c65c52775e6802ed6814d7803879e",
+    "source": "bb2dcd2196f8c527c5855d959fa5233b6eef5981a1b402241477ea8e2d8bb5bb",
     "sdk": "f4053245038d65dd3daac0194fa4fb40130b4882da6c41322264eaba0d61ee48"
   },
   "linux-arm64": {
     "file": "bin/zleap-app",
-    "sha256": "d843653b4dab16c3f9b9261c6fda3196e8f63e0073f4fe22e05aa8ae7deef3fa",
+    "sha256": "ce019e6802e3f2026391131c28accd4ae11e7f024e2703174fa0b2e6c3ab0244",
     "commit": "657379af",
-    "source": "71b1151d964d9bd79ac7e301dfeb73517d6c65c52775e6802ed6814d7803879e",
+    "source": "bb2dcd2196f8c527c5855d959fa5233b6eef5981a1b402241477ea8e2d8bb5bb",
     "sdk": "f4053245038d65dd3daac0194fa4fb40130b4882da6c41322264eaba0d61ee48"
   },
   "win32-x64": {
     "file": "bin/zleap-app.exe",
-    "sha256": "54d3a92d5bb50174a5ab96b55e4ddf65c3a5560eef7fc916812a29309e17aa72",
+    "sha256": "dd78bff66b94dfba2f92437096700cfc2e0e6be7bf40b0ec26386dd121b8bc35",
     "commit": "657379af",
-    "source": "71b1151d964d9bd79ac7e301dfeb73517d6c65c52775e6802ed6814d7803879e",
+    "source": "bb2dcd2196f8c527c5855d959fa5233b6eef5981a1b402241477ea8e2d8bb5bb",
     "sdk": "f4053245038d65dd3daac0194fa4fb40130b4882da6c41322264eaba0d61ee48"
   }
 }

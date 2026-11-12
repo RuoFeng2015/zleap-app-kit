@@ -1,6 +1,6 @@
 {
   "name": "@zleap-ai/app-sdk",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "description": "zleapOS 云开发前端 SDK：Cloud 数据库 / 文件 / 云函数（zl.cloud）、宿主能力（connectHostedApp）与工作区连接",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
