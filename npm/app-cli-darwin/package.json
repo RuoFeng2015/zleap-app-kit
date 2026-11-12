@@ -19,8 +19,8 @@
   ],
   "preferUnplugged": true,
   "zleapApp": {
-    "commit": "8eba12cf",
-    "sha256": "631aee5c98244882f7b27004feb8eba5b5d4d4bfd722cd7e17f10fb61468e0f7",
-    "source": "8300aeb31d0f66ac8cd269ebec9a6bb1ea81d36fd20be101070dad09ac651dab"
+    "commit": "30e1ed8b",
+    "sha256": "a5a533be0bb8f3d9c4832b85270100143f1e8ac2a1b77d65a4b9be9551ef809b",
+    "source": "71b1151d964d9bd79ac7e301dfeb73517d6c65c52775e6802ed6814d7803879e"
   }
 }
