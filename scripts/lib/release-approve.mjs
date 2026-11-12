@@ -106,27 +106,36 @@ export function createApprovalClient(options, { fetch = registryFetch, webAuthOp
   };
 }
 
-export async function approveBatch(items, { client, dryRun = false, authenticate, log = () => {}, wait = sleep, validationAttempts = 60, maxAuthentications = 3 } = {}) {
+// maxAuthentications 是每个包的上限：web 2FA 的口令是一次性的，服务端通常每个包都要重新验证一次。
+export async function approveBatch(items, { client, dryRun = false, authenticate, log = () => {}, wait = sleep, validationAttempts = 120, maxAuthentications = 2 } = {}) {
   if (dryRun || items.length === 0) return { approved: [], unattempted: items };
   const approved = [];
   let current;
   let otp;
-  let authentications = 0;
   try {
     let ready = false;
     for (let attempt = 0; attempt < validationAttempts; attempt++) {
       const staged = await client.stagedItems();
-      if (!staged.some((item) => items.some((own) => own.id === item.id) && item.status === 'validating')) { ready = true; break; }
+      const validating = staged.filter((item) => items.some((own) => own.id === item.id) && item.status === 'validating');
+      if (validating.length === 0) { ready = true; break; }
+      // 校验可能要几分钟，期间必须有输出，否则看起来像卡死。
+      if (attempt % 6 === 0) log(`等待 npm 校验暂存包（还有 ${validating.length} 个校验中，已等 ${attempt * 5} 秒）…`);
       if (attempt + 1 < validationAttempts) await wait(5000);
     }
     if (!ready) throw new ApprovalError('暂存校验等待超时，未批准任何包');
     for (const item of items) {
       current = item;
+      let authentications = 0;
       for (;;) {
         try { await client.approve(item, otp); break; }
         catch (error) {
-          if (error.code !== 'EOTP' || authentications >= maxAuthentications) throw error;
+          if (error.code !== 'EOTP') throw error;
+          // 带着用过的一次性口令被拒时，响应里没有浏览器验证地址（会误落到 6 位验证码输入）。
+          // 去掉旧口令重发一次，拿到新的浏览器质询。
+          if (otp && !error.body?.authUrl) { otp = undefined; continue; }
+          if (authentications >= maxAuthentications) throw error;
           authentications++;
+          log(`需要 2FA 验证：${item.name}@${item.version}`);
           otp = await authenticate(error);
           if (typeof otp !== 'string' || !otp) throw new ApprovalError('验证已取消');
         }

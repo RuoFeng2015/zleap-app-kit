@@ -11,8 +11,8 @@
 //
 // 为什么使用批次授权：npm 12 的 `npm stage publish` 上传时不要 2FA，只有批准（approve）要。
 // 所以先把所有包上传进暂存区（慢的部分），再连续批准（每个只是一次很小的请求）：
-//   · 2FA 验证结果仅在批次内存中复用，服务端可能要求重新验证。
-//   · 仅 EOTP 重新验证（最多 3 次）；其他错误停止，不逐包降级。
+//   · 2FA 验证结果仅在批次内存中复用；浏览器 / 安全密钥验证的口令是一次性的，服务端通常每个包都要重新验证。
+//   · 仅 EOTP 重新验证（每个包最多 2 次）；其他错误停止，不逐包降级。
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { ApprovalError, approveBatch, createApprovalClient, loadApprovalOptions } from './lib/release-approve.mjs';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -271,10 +271,18 @@ async function approveAll(staged) {
   });
 }
 
-/** 续跑：只批准暂存区里本仓库的包，按依赖顺序。 */
+/** 续跑：只批准暂存区里本仓库当前版本（kit.config.json）的包，按依赖顺序。 */
 async function approveStaged() {
   const order = [...config.platforms.map(platformPackageName), config.cliPackage, config.sdkPackage, config.createPackage];
-  const candidates = (await stagedItems()).filter((item) => order.includes(item.packageName));
+  const wanted = (name) => name === config.sdkPackage ? config.sdkVersion : name === config.createPackage ? config.createVersion : config.cliVersion;
+  const own = (await stagedItems()).filter((item) => order.includes(item.packageName));
+  // 以前中断留下的旧版本不能批准：它们带着 latest 标签，晚于新版本上线会把 latest 指回旧版本。
+  const stale = own.filter((item) => item.version !== wanted(item.packageName));
+  if (stale.length) {
+    console.log(dim(`  跳过暂存区里 ${stale.length} 个不是当前版本的旧暂存（不用可清理：npx -y npm@12 stage reject <id>）：`));
+    for (const item of stale) console.log(dim(`    ${item.packageName}@${item.version}  ${item.id}`));
+  }
+  const candidates = own.filter((item) => !stale.includes(item));
   const unpublished = [];
   for (const item of candidates) {
     if (!(await (await client()).published(item.packageName, item.version))) unpublished.push(item);

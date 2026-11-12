@@ -23,13 +23,37 @@ test('ordered batch shares first OTP and never logs credentials', async () => {
   assert.ok(!logs.join('').includes('SECRET'));
 });
 
-test('only EOTP reauthenticates, bounded across entire batch', async () => {
+test('single-use OTP: stale OTP is dropped and each package gets a fresh browser challenge', async () => {
+  const used = new Set(); let auth = 0; const challenges = [];
+  const result = await approveBatch(items, {
+    client: { stagedItems: async () => [], approve: async (item, otp) => {
+      if (!otp) throw Object.assign(failure('EOTP'), { body: { authUrl: 'https://npmjs.com/auth', doneUrl: 'https://registry.example/done' } });
+      if (used.has(otp)) throw failure('EOTP');
+      used.add(otp);
+    } },
+    authenticate: async (error) => { challenges.push(error.body?.authUrl); return `OTP${auth++}`; },
+  });
+  assert.deepEqual(result.approved, items);
+  assert.equal(auth, items.length);
+  assert.ok(challenges.every(Boolean));
+});
+
+test('validation wait reports progress', async () => {
+  const logs = []; let polls = 0;
+  await approveBatch(items, {
+    client: { stagedItems: async () => (polls++ === 0 ? [{ ...items[0], status: 'validating' }] : []), approve: async () => {} },
+    wait: async () => {}, log: (s) => logs.push(s),
+  });
+  assert.match(logs[0], /等待 npm 校验/);
+});
+
+test('only EOTP reauthenticates, bounded per package', async () => {
   let auth = 0, calls = 0;
   await assert.rejects(approveBatch(items, {
     client: { stagedItems: async () => [], approve: async () => { calls++; throw failure('EOTP'); } },
     authenticate: async () => { auth++; return 'SECRET'; },
   }), /EOTP/);
-  assert.equal(auth, 3); assert.equal(calls, 4);
+  assert.equal(auth, 2); assert.equal(calls, 5);
 });
 
 for (const code of ['E403', 'E401', 'ETIMEDOUT', 'ECONNRESET', 'ABORT_ERR']) {
