@@ -73,6 +73,18 @@ for (const code of ['E403', 'E401', 'ETIMEDOUT', 'ECONNRESET', 'ABORT_ERR']) {
   });
 }
 
+test('failure report shows HTTP status and timeout codes, nothing else from upstream', async () => {
+  for (const [code, shown] of [['E429', 'E429'], ['E500', 'E500'], ['EIDLETIMEOUT', 'EIDLETIMEOUT'], ['SECRET_CODE', '请求失败或结果未知'], [undefined, '请求失败或结果未知']]) {
+    await assert.rejects(approveBatch(items, {
+      client: { stagedItems: async () => [], approve: async () => { throw failure(code); } },
+    }), error => {
+      assert.ok(error.message.includes(`批准批次停止：${shown}`));
+      assert.ok(!error.message.includes('SECRET'));
+      return true;
+    });
+  }
+});
+
 test('cancelled authentication stops with no further package requests', async () => {
   let calls = 0;
   await assert.rejects(approveBatch(items, {

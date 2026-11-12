@@ -16,8 +16,12 @@ export class ApprovalError extends Error {}
 
 // Never include upstream messages, bodies, URLs, options or causes: they may contain credentials.
 export function safeFailure(error) {
-  const codes = new Set(['EOTP', 'E401', 'E403', 'E404', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'ABORT_ERR']);
-  return codes.has(error?.code) ? error.code : '请求失败或结果未知';
+  const codes = new Set(['EOTP', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'ABORT_ERR',
+    'EIDLETIMEOUT', 'ECONNECTIONTIMEOUT', 'ERESPONSETIMEOUT', 'ETRANSFERTIMEOUT']);
+  const code = error?.code;
+  // HTTP 状态码（E429、E500 等）只是数字，不含凭据；不显示就无法判断失败原因。
+  if (codes.has(code) || (typeof code === 'string' && /^E\d{3}$/.test(code))) return code;
+  return '请求失败或结果未知';
 }
 
 export async function loadApprovalOptions({ cwd, env = process.env, argv = [], ...overrides } = {}) {

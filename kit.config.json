@@ -1,9 +1,9 @@
 {
   "$comment": "发布坐标集中在这里。改名只改这一个文件，然后运行 npm run sync。",
   "$commentVersions": "三条版本线互相独立，只给真正变了的包递增：cliVersion 管 CLI 主包与平台子包（只有 zleap-app Go 源码变了才递增），sdkVersion 管 SDK，createVersion 管脚手架与随附 skills。已发布的版本发布脚本会自动跳过。",
-  "cliVersion": "0.12.9",
+  "cliVersion": "0.12.10",
   "sdkVersion": "0.12.4",
-  "createVersion": "0.12.9",
+  "createVersion": "0.12.10",
   "npmScope": "@zleap-ai",
   "cliPackage": "@zleap-ai/app-cli",
   "sdkPackage": "@zleap-ai/app-sdk",
