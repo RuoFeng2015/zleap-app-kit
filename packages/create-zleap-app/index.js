@@ -183,15 +183,24 @@ async function main() {
     }
 
     const cd = relative(process.cwd(), targetDir) || '.';
+    // 命令和注释两列：注释按最长的命令对齐（没给 --target 时 login 那行最长）。
+    const stepRows = [
+      [runScriptCommand(pm, 'login', options.target ? '' : '--target https://你的-os-地址'), appid ? '# 浏览器授权' : '# 浏览器授权，同时新建应用'],
+      [runScriptCommand(pm, 'deploy'), BUILD_TEMPLATES.includes(options.template) ? '# 构建→检查→上传→装到你的桌面' : '# 检查→上传→装到你的桌面（不用构建）'],
+      [runScriptCommand(pm, 'open'), '# 在浏览器直接打开应用，用你自己的身份测试（不用发布）'],
+    ];
+    // 终端里中文占两格，按显示宽度补空格。
+    const cols = (text) => [...text].reduce((n, ch) => n + (/[\u2e80-\uffff]/.test(ch) ? 2 : 1), 0);
+    const width = Math.max(...stepRows.map(([command]) => cols(command))) + 3;
+    const steps = stepRows.map(([command, note]) => `  ${command}${' '.repeat(width - cols(command))}${dim(note)}`).join('\n');
 
     console.log(`
 ${bold('完成！接下来：')}
 
   cd ${cd}${installed ? '' : `\n  ${pm} install`}
-  ${runScriptCommand(pm, 'login', options.target ? '' : '--target https://你的-os-地址')}   ${dim(appid ? '# 浏览器授权' : '# 浏览器授权，同时新建应用')}
-  ${runScriptCommand(pm, 'deploy')}                                         ${dim(BUILD_TEMPLATES.includes(options.template) ? '# 构建→检查→上传→装到你的桌面' : '# 检查→上传→装到你的桌面（不用构建）')}
+${steps}
 
-  然后从 zleapOS 启动台打开应用（开发环境与数据库在安装时自动开通）。
+  也可以从 zleapOS 启动台打开（开发环境与数据库在安装时自动开通）。改代码后再 deploy，已打开的窗口点「重新加载应用」。
 
 ${bold('让 AI 编程工具帮你开发')}
   ${options.skills ? '项目里已带 AGENTS.md、skills 和 MCP 配置' : '项目里已带 AGENTS.md 和 MCP 配置（按 --no-skills 没有安装 skills）'}（.mcp.json、.cursor/mcp.json），直接在 Claude Code / Cursor / Codex / OpenCode 里打开本目录即可。

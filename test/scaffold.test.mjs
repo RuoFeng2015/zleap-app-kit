@@ -205,6 +205,8 @@ test('完成提示：--pm pnpm 给出可执行的脚本命令；--no-skills 不�
   assert.equal(pnpm.status, 0, pnpm.stderr);
   assert.match(pnpm.stdout, /pnpm run login --target /);
   assert.match(pnpm.stdout, /pnpm run deploy/);
+  assert.match(pnpm.stdout, /pnpm run open/); // 部署后直接打开应用自测，不用发布
+  assert.doesNotMatch(pnpm.stdout, /然后从 zleapOS 启动台打开应用/);
   assert.doesNotMatch(pnpm.stdout, /pnpm (login|deploy)\b/);
   assert.match(pnpm.stdout, /已带 AGENTS\.md、skills/);
   const bare = spawnSync(process.execPath, [cli, 'q', '--no-install', '--no-git', '--no-skills', '-y'], { cwd, encoding: 'utf8' });
