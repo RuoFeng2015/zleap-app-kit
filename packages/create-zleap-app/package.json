@@ -1,6 +1,6 @@
 {
   "name": "create-zleap-app",
-  "version": "0.12.6",
+  "version": "0.12.7",
   "description": "一条命令创建 zleapOS 云开发应用（React + TypeScript + Vite，或不用构建的原生 HTML/JS），并为 Codex / Claude Code / Pi / OpenCode / Cursor 等 AI 编程工具配好 skills",
   "license": "MIT",
   "repository": {
@@ -23,9 +23,9 @@
   },
   "zleapKit": {
     "cliPackage": "@zleap-ai/app-cli",
-    "cliVersion": "0.12.6",
+    "cliVersion": "0.12.7",
     "sdkPackage": "@zleap-ai/app-sdk",
-    "sdkVersion": "0.12.1",
+    "sdkVersion": "0.12.2",
     "skillsRepo": "RuoFeng2015/zleap-app-kit"
   },
   "keywords": [

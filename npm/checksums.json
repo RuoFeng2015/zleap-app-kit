@@ -1,30 +1,30 @@
 {
   "darwin": {
     "file": "bin/zleap-app",
-    "sha256": "63a5012a6cd0dd3b83972c432f478f2c19838bb03fb7d570545c883e55a59353",
-    "commit": "f5ec814c",
-    "source": "ee9adc0ea99e997c251db8cdef643f5b6b35e6936611255b5e99c085aa2e8a8e",
-    "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
+    "sha256": "631aee5c98244882f7b27004feb8eba5b5d4d4bfd722cd7e17f10fb61468e0f7",
+    "commit": "8eba12cf",
+    "source": "8300aeb31d0f66ac8cd269ebec9a6bb1ea81d36fd20be101070dad09ac651dab",
+    "sdk": "f4053245038d65dd3daac0194fa4fb40130b4882da6c41322264eaba0d61ee48"
   },
   "linux-x64": {
     "file": "bin/zleap-app",
-    "sha256": "404421bd1b6f4f2da5eef66f7150c86225bae2529f3f9afacebea1b0cc3fedc5",
-    "commit": "f5ec814c",
-    "source": "ee9adc0ea99e997c251db8cdef643f5b6b35e6936611255b5e99c085aa2e8a8e",
-    "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
+    "sha256": "bfb972a50b92f57570b9cb820c314a0d24eedfb94c84ee2ce1456dcd6f346f73",
+    "commit": "8eba12cf",
+    "source": "8300aeb31d0f66ac8cd269ebec9a6bb1ea81d36fd20be101070dad09ac651dab",
+    "sdk": "f4053245038d65dd3daac0194fa4fb40130b4882da6c41322264eaba0d61ee48"
   },
   "linux-arm64": {
     "file": "bin/zleap-app",
-    "sha256": "7f092b49a5e603824d9dee78e7c000b0e8786f7b243001372eea6d4ccfb5d5be",
-    "commit": "f5ec814c",
-    "source": "ee9adc0ea99e997c251db8cdef643f5b6b35e6936611255b5e99c085aa2e8a8e",
-    "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
+    "sha256": "da4f7dd73afa75d70dcb19a7453a9fc6b82ad2a8897cb25c45afae6497cfa583",
+    "commit": "8eba12cf",
+    "source": "8300aeb31d0f66ac8cd269ebec9a6bb1ea81d36fd20be101070dad09ac651dab",
+    "sdk": "f4053245038d65dd3daac0194fa4fb40130b4882da6c41322264eaba0d61ee48"
   },
   "win32-x64": {
     "file": "bin/zleap-app.exe",
-    "sha256": "6673d420e400e7544594fbbca4091638f7fc8ff797f96deecf5f954121bd5395",
-    "commit": "f5ec814c",
-    "source": "ee9adc0ea99e997c251db8cdef643f5b6b35e6936611255b5e99c085aa2e8a8e",
-    "sdk": "7dd7c613af84ef97e2a01fe9c77db07448f605e2d63029805bfac3a121cfcf98"
+    "sha256": "0a685d76e9d92ffdfa88312a401ee7ca2abd2634688a6fa53bd0d1cb228b0845",
+    "commit": "8eba12cf",
+    "source": "8300aeb31d0f66ac8cd269ebec9a6bb1ea81d36fd20be101070dad09ac651dab",
+    "sdk": "f4053245038d65dd3daac0194fa4fb40130b4882da6c41322264eaba0d61ee48"
   }
 }
