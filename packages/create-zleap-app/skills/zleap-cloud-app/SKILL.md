@@ -99,6 +99,10 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
 6. **请用户验收**（按这条功能的「做完能看到」逐条核对，并顺手回归之前做好的功能）：安装时平台会自动创建开发环境、开通数据库并按声明建集合，`npm run deploy` 结束时会打印状态；显示未就绪时，请用户在「云开发控制台」选中应用 →「概览」按提示处理。然后运行 `npm run open`（在浏览器打开 zleapOS 并直接拉起本人已装的版本，开发版本不用发布就能测；没装会提示先 deploy），或从启动台打开（已打开的点「重新加载应用」）。
 7. **排查**：`npm run status`（安装、权限、版本）、`npm run logs`（24h 页面结构化错误 + 本人云函数日志，自动选当前所在环境）、控制台「运行体检」。云函数可以不经界面直接测：`npx zleap-app invoke --capability <id> --environment dev --input-file payload.json`（项目目录里省略应用 ID），再 `npm run logs -- --invocation <编号>`。改完回到第 4 步。
 
+**换电脑 / 接手同事的应用**：`npm run deploy` 会自动附带源码快照（不含依赖、构建产物、密钥类文件；`--no-source` 可关）。
+应用成员先 `npx @zleap-ai/app-cli auth login --target <OS> --app-key <appid>`，再 `npx @zleap-ai/app-cli source pull <appid> <新目录>` 导出（保留原 appid），
+`npm install` 后照常开发，`npm run deploy` 更新的就是同一个应用；MCP 里对应 `app_sources_list` / `app_source_pull`。提示「还没有源码快照」时，请原开发者用新版 CLI 再 deploy 一次。
+
 `npx zleap-app …` 只在装了 `@zleap-ai/app-cli` 的项目里可用；项目外或原生模板（没有 package.json）请用 `npx @zleap-ai/app-cli …`。原生模板没有 npm 脚本时，用 CLI 等价命令：`npx @zleap-ai/app-cli check .`、`publish .`、`install <app_id>`、`diagnose <app_id>`、`update <app_id> --expected-version-id <当前> --version-id <新>`。
 
 ### 版本更新提示与授权登录（不需要云资源）

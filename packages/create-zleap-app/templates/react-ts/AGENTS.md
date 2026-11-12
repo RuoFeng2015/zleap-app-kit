@@ -20,6 +20,7 @@
 | 登录 OS（浏览器授权，自动续期，最长 30 天；manifest 还没有 appid 时同时新建应用） | `npm run login -- --target <OS 地址>` |
 | 构建→检查→上传开发版本→装到本人 | `npm run deploy` |
 | 在浏览器打开 zleapOS 并直接拉起本人已装的应用（本人身份自测，不用发布；`-- --no-browser` 只打印链接） | `npm run open` |
+| 换电脑 / 接手同事的应用：导出源码（保留原 appid，之后 deploy 更新同一个应用；需是应用成员） | `npx zleap-app source pull <appid> <新目录>` |
 | 安装/权限/版本诊断 | `npm run status` |
 | 页面错误与云函数日志（24h） | `npm run logs`（`-- --environment dev\|prod`、`--invocation <调用编号>`） |
 | 版本列表（含线上版本） | `npm run versions` |

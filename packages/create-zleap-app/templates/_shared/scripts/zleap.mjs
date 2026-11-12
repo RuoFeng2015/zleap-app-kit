@@ -2,7 +2,8 @@
 // 项目内的一键命令，封装 zleap-app CLI：
 //
 //   npm run login  [-- --target https://os.example.com] [--browser-timeout 10m]  浏览器授权，保存开发会话（自动续期，最长 30 天）
-//   npm run deploy [-- --no-build] [--no-install]          构建 → 检查 → zleap-app deploy（上传开发版本 → 安装/切换 → 按诊断准备资源）
+//   npm run deploy [-- --no-build] [--no-install] [--no-source]
+//                                                         构建 → 检查 → zleap-app deploy（上传开发版本并附带源码快照 → 安装/切换 → 按诊断准备资源）
 //   npm run status                                        查看本应用的安装、权限与可用版本
 //   npm run versions                                      列出全部成员上传的开发版本、当前线上版本和发布记录
 //   npm run release [-- --version-id <id>] [--notes 说明] [--yes]
@@ -286,6 +287,8 @@ async function deploy() {
   log('上传开发版本并装到本人');
   const args = ['deploy', '.', '--package-dir', packageDir];
   if (has('no-install')) args.push('--no-install');
+  // 默认附带源码快照，应用成员以后可以 zleap-app source pull 导出继续开发；不想上传源码时加 --no-source。
+  if (has('no-source')) args.push('--no-source');
   const result = cli(args);
   const out = result.json ?? {};
   if (result.code !== 0) {
@@ -302,6 +305,17 @@ async function deploy() {
   const appId = id(out.app_id);
   const versionId = id(out.version_id);
   ok(`已上传 v${report.version}：app_id=${appId} version_id=${versionId} package_id=${id(out.package_id)}`);
+  // 源码快照（新版 CLI）：成员在别的机器 npx zleap-app source pull <appid> 就能接着开发同一个应用。
+  if (out.source?.status === 'unchanged') console.log('  源码快照与上次相同，未重复上传');
+  else if (out.source) ok(`已附带源码快照（${out.source.files ?? '?'} 个文件）：应用成员可用 npx zleap-app source pull ${out.appid ?? ''} 导出继续开发`);
+  else if (out.source_warning) warn(`源码快照未附带：${out.source_warning}（不影响部署）`);
+  // 本地代码基于较早的版本、之后有别的成员上传了更新的版本：这次部署成了最新版本，但对方的改动没有合并进来。
+  if (out.behind) {
+    warn(
+      `你的代码基于 version_id ${out.behind.base_version_id}，之后又有人上传了 v${out.behind.newer_version}（version_id ${out.behind.newer_version_id}）。` +
+        `这次部署已成为最新开发版本，但对方的改动没有合并进来；需要的话导出对比后合并再部署：npx zleap-app source pull ${out.appid ?? ''} <新目录> --version-id ${out.behind.newer_version_id}`,
+    );
+  }
   // 平台 appid 应用：带云函数 / 后台能力的版本上传后平台自动签名；签不上时回执带原因（旧平台没有这个字段）。
   if (out.auto_sign?.status === 'failed') {
     warn(
