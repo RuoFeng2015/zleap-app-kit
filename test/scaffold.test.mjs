@@ -103,6 +103,11 @@ test('生成项目：占位符全部替换，JSON/HTML 正确转义，skills 装
   for (const command of ['npm run preview', 'npm run login', 'npm run deploy', 'npm run open']) assert.match(readme, new RegExp(command), command);
   assert.doesNotMatch(readme, /npm run dev/);
   assert.doesNotMatch(readme, /OS 已连接/);
+  // 部署后马上打开时数据库还在开通：窗口只握手一次不会自动刷新，提示要明确「点重新加载应用」（2026-11-12 实测）。
+  assert.match(readFileSync(join(dir, 'src/App.tsx'), 'utf8'), /数据库还没就绪[\s\S]*重新加载应用/);
+  const clientSource = readFileSync(join(dir, 'src/cloud/client.ts'), 'utf8');
+  assert.match(clientSource, /UNSUPPORTED_OPERATION: '[^']*重新加载应用/);
+  assert.doesNotMatch(clientSource, /请稍后刷新。'/);
   assert.equal(isEmptyDir(dir), false);
 
   const names = installSkills({ skillsDir: join(root, 'skills'), targetDir: dir });

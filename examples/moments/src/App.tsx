@@ -65,7 +65,8 @@ export function App() {
       ) : null}
       {state.status === 'ready' && !hasProfile(state.capabilities, 'document-core/1') ? (
         <Notice tone="warn" title="还不能读写动态">
-          点应用窗口顶部「权限」，勾选读取和修改应用数据后保存。
+          刚部署时数据库通常还在开通（一分钟内就绪），这个窗口不会自动刷新：稍等后点窗口顶部「重新加载应用」。
+          重新加载后仍是这样，再点窗口顶部「权限」，勾选读取和修改应用数据后保存。
         </Notice>
       ) : null}
       {state.status === 'ready' && hasProfile(state.capabilities, 'document-core/1') ? (

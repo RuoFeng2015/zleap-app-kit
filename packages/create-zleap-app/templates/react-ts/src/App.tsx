@@ -43,8 +43,9 @@ export function App() {
         </Alert>
       ) : null}
       {state.status === 'ready' && !ready ? (
-        <Alert tone="warning" title="数据库能力未就绪">
-          通常是开发环境或数据库还在开通，或窗口顶部「权限」里没有勾选数据读写。
+        <Alert tone="warning" title="数据库还没就绪">
+          开发环境和数据库通常在部署后一分钟内开通完成。这个窗口只在打开时检查一次，不会自动刷新：
+          稍等片刻后点窗口顶部「重新加载应用」。重新加载后仍是这样，再检查窗口顶部「权限」里是否勾选了数据读写。
         </Alert>
       ) : null}
       {state.status === 'connecting' ? <ListSkeleton /> : null}
