@@ -92,3 +92,16 @@ test('入口透传参数、标准输出与退出码', { skip: process.platform =
   assert.equal(result.stdout.trim(), 'args:check --target https://os.example.com');
   assert.equal(result.stderr.trim(), 'err');
 });
+
+test('低于声明的 Node 版本时拒绝运行，提供升级提示且不启动二进制', () => {
+  const dir = fakePlatformPackage();
+  const preload = join(dir, 'old-node.cjs');
+  writeFileSync(preload, "Object.defineProperty(process.versions, 'node', { value: '16.20.2' });");
+  const result = spawnSync(process.execPath, ['--require', preload, shim, 'version'], {
+    env: { ...process.env, ZLEAP_APP_BINARY: join(dir, 'bin', 'zleap-app') },
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /Node.js >=18.*16.20.2.*升级/);
+});

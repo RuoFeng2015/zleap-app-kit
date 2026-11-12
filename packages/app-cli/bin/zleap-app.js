@@ -3,6 +3,11 @@
 // zleap-app 的 npm 入口：找到当前平台的预编译二进制，原样透传参数、标准输入输出与退出码。
 // MCP（zleap-app mcp serve）依赖 stdio 透传，这里不能向 stdout 写任何额外内容。
 
+if (Number(process.versions.node.split('.')[0]) < 18) {
+  process.stderr.write(`zleap-app: 需要 Node.js >=18，当前为 ${process.versions.node}。请升级 Node.js 后重试。\n`);
+  process.exit(1);
+}
+
 const { spawn } = require('node:child_process');
 const { resolveBinary, BinaryNotFoundError } = require('../lib/resolve.js');
 

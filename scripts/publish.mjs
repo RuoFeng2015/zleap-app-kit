@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 备用的逐个直接发布（每个包各自 2FA）。日常请用 npm run release（scripts/release.mjs：自动检测 + 一次授权）。
+// 备用的逐个直接发布（每个包各自 2FA）。日常请用 npm run release（scripts/release.mjs：自动检测 + 暂存后逐包批准）。
 // 按依赖顺序发布：平台子包 → CLI 主包 → SDK → create-zleap-app。
 // registry 上已有的版本直接跳过，也不要求本地有它的产物：只改了 SDK 时不用编译 CLI，只改了模板时两者都不用构建。
 //

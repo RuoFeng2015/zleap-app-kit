@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 一键发布：和 npm 上的 latest 比 → 只发真正变了的包 → 自动定版本 → 构建、测试 → 暂存发布（不要 2FA）→ 批次共享授权批准。
+// 一键发布：和 npm 上的 latest 比 → 只发真正变了的包 → 自动定版本 → 构建、测试 → 暂存发布（不要 2FA）→ 逐包 2FA 批准。
 //
 //   npm run release                    # 打印发布计划，确认后执行
 //   npm run release -- --dry-run       # 只检测、打印计划，不改任何文件
@@ -9,9 +9,9 @@
 //   --refs                             # 文档站有新改动时同步进 skills（配合 --yes；交互模式会问）
 //   --source ../zleap-service --docs ../zleap-web/apps/docs   # 事实源位置（默认同级目录）
 //
-// 为什么使用批次授权：npm 12 的 `npm stage publish` 上传时不要 2FA，只有批准（approve）要。
+// 为什么先暂存再批准：npm 12 的 `npm stage publish` 上传时不要 2FA，只有批准（approve）要。
 // 所以先把所有包上传进暂存区（慢的部分），再连续批准（每个只是一次很小的请求）：
-//   · 2FA 验证结果仅在批次内存中复用；浏览器 / 安全密钥验证的口令是一次性的，服务端通常每个包都要重新验证。
+//   · npm 没有批量批准接口，浏览器 / 通行密钥验证的口令是一次性的：实测每个包都要验证一次。
 //   · 仅 EOTP 重新验证（每个包最多 2 次）；其他错误停止，不逐包降级。
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { ApprovalError, approveBatch, createApprovalClient, loadApprovalOptions } from './lib/release-approve.mjs';
@@ -417,7 +417,7 @@ async function main() {
   const staged = [];
   for (const target of pending) staged.push({ ...target, id: await stage(target, existing) });
 
-  step(`批准上线（${staged.length} 个，按依赖顺序；批次内复用 2FA，服务端可能要求重新验证）`);
+  step(`批准上线（${staged.length} 个，按依赖顺序；每个包都要过一次 2FA）`);
   await approveAll(staged);
   await verify(targets);
 }
