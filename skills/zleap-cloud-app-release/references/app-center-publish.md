@@ -38,9 +38,10 @@
 
 ## 上传应用包
 
-> **先在控制台创建应用**（提示）
+> **上传前 manifest 要有 appid**（提示）
 >
-> 上传前应用必须已在 [云开发控制台「创建应用」](console-members.md#创建应用) 创建，并把生成的 `appid` 写进 `manifest.json`；
+> `manifest.json` 里要有这个应用的 `appid`：用脚手架时第一次 `npm run login` 会在授权里新建应用并写回 appid；
+> 也可以先在 [云开发控制台「创建应用」](console-members.md#创建应用) 创建，再把生成的 `appid` 写进 `manifest.json`；
 > 上传者必须是这个应用的成员（管理员或开发者）。
 
 ### 操作步骤

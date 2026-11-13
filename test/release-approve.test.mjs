@@ -76,13 +76,30 @@ for (const code of ['E403', 'E401', 'ETIMEDOUT', 'ECONNRESET', 'ABORT_ERR']) {
 test('failure report shows HTTP status and timeout codes, nothing else from upstream', async () => {
   for (const [code, shown] of [['E429', 'E429'], ['E500', 'E500'], ['EIDLETIMEOUT', 'EIDLETIMEOUT'], ['SECRET_CODE', '请求失败或结果未知'], [undefined, '请求失败或结果未知']]) {
     await assert.rejects(approveBatch(items, {
-      client: { stagedItems: async () => [], approve: async () => { throw failure(code); } },
+      client: { stagedItems: async () => [], approve: async () => { throw failure(code); } }, wait: async () => {},
     }), error => {
       assert.ok(error.message.includes(`批准批次停止：${shown}`));
       assert.ok(!error.message.includes('SECRET'));
       return true;
     });
   }
+});
+
+test('E429 waits (honouring retry-after), reauthenticates and retries; gives up after bounded waits', async () => {
+  const waits = [], logs = []; let calls = 0, auth = 0;
+  const limited = Object.assign(failure('E429'), { headers: { 'retry-after': ['90'] } });
+  const result = await approveBatch(items.slice(0, 1), {
+    client: { stagedItems: async () => [], approve: async (item, otp) => { calls++; if (!otp) throw failure('EOTP'); if (calls === 2) throw limited; } },
+    authenticate: async () => { auth++; return 'SECRET'; }, wait: async (ms) => { waits.push(ms); }, log: (s) => logs.push(s),
+  });
+  assert.equal(result.approved.length, 1); assert.equal(auth, 2);
+  assert.deepEqual(waits, [60000, 30000]);
+  assert.ok(logs.some((s) => /限流/.test(s)) && !logs.join('').includes('SECRET'));
+  let total = 0;
+  await assert.rejects(approveBatch(items.slice(0, 1), {
+    client: { stagedItems: async () => [], approve: async () => { total++; throw failure('E429'); } }, wait: async () => {},
+  }), /E429.*限流/);
+  assert.equal(total, 4);
 });
 
 test('cancelled authentication stops with no further package requests', async () => {

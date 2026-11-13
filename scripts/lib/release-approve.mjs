@@ -111,7 +111,14 @@ export function createApprovalClient(options, { fetch = registryFetch, webAuthOp
 }
 
 // maxAuthentications 是每个包的上限：web 2FA 的口令是一次性的，服务端通常每个包都要重新验证一次。
-export async function approveBatch(items, { client, dryRun = false, authenticate, log = () => {}, wait = sleep, validationAttempts = 120, maxAuthentications = 2 } = {}) {
+// npm 对 2FA 批准有频率限制（实测短时间内约 5 个包后返回 429）：等一会儿自动重试，而不是直接失败。
+function throttleSeconds(error) {
+  const raw = [].concat(error?.headers?.['retry-after'] ?? [])[0];
+  const seconds = Number(raw);
+  return Math.min(900, Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 300);
+}
+
+export async function approveBatch(items, { client, dryRun = false, authenticate, log = () => {}, wait = sleep, validationAttempts = 120, maxAuthentications = 2, maxThrottleWaits = 3 } = {}) {
   if (dryRun || items.length === 0) return { approved: [], unattempted: items };
   const approved = [];
   let current;
@@ -130,18 +137,29 @@ export async function approveBatch(items, { client, dryRun = false, authenticate
     for (const item of items) {
       current = item;
       let authentications = 0;
+      let throttled = 0;
       for (;;) {
-        try { await client.approve(item, otp); break; }
-        catch (error) {
-          if (error.code !== 'EOTP') throw error;
-          // 带着用过的一次性口令被拒时，响应里没有浏览器验证地址（会误落到 6 位验证码输入）。
-          // 去掉旧口令重发一次，拿到新的浏览器质询。
-          if (otp && !error.body?.authUrl) { otp = undefined; continue; }
-          if (authentications >= maxAuthentications) throw error;
-          authentications++;
-          log(`需要 2FA 验证：${item.name}@${item.version}`);
-          otp = await authenticate(error);
-          if (typeof otp !== 'string' || !otp) throw new ApprovalError('验证已取消');
+        try {
+          try { await client.approve(item, otp); break; }
+          catch (error) {
+            if (error.code !== 'EOTP') throw error;
+            // 带着用过的一次性口令被拒时，响应里没有浏览器验证地址（会误落到 6 位验证码输入）。
+            // 去掉旧口令重发一次，拿到新的浏览器质询。
+            if (otp && !error.body?.authUrl) { otp = undefined; continue; }
+            if (authentications >= maxAuthentications) throw error;
+            authentications++;
+            log(`需要 2FA 验证：${item.name}@${item.version}`);
+            otp = await authenticate(error);
+            if (typeof otp !== 'string' || !otp) throw new ApprovalError('验证已取消');
+          }
+        } catch (error) {
+          // 429 = 请求被限流、没有被处理，等待后重试是安全的；重试时需要重新验证。
+          if (error?.code !== 'E429' || throttled >= maxThrottleWaits) throw error;
+          throttled++; otp = undefined; authentications = 0;
+          for (let left = throttleSeconds(error); left > 0; left -= 60) {
+            log(`npm 限流（429）：${item.name}@${item.version} 还要等约 ${Math.ceil(left / 60)} 分钟后自动重试（第 ${throttled}/${maxThrottleWaits} 次）…`);
+            await wait(Math.min(60, left) * 1000);
+          }
         }
       }
       approved.push(item);
@@ -152,7 +170,8 @@ export async function approveBatch(items, { client, dryRun = false, authenticate
   } catch (error) {
     const unattempted = items.filter((item) => !approved.includes(item) && item !== current);
     const label = (list) => list.map((item) => `${item.name}@${item.version}`).join('、') || '无';
-    const message = `批准批次停止：${error instanceof ApprovalError ? error.message : safeFailure(error)}\n已成功：${label(approved)}\n失败/结果未知：${label(current ? [current] : [])}\n尚未尝试：${label(unattempted)}\n请用 npm run release:approve 重新查询后续跑；不会逐包降级授权。`;
+    const hint = error?.code === 'E429' ? '（npm 对 2FA 批准限流，包仍在暂存区；过 15 分钟以上再续跑，不要重跑 npm run release）' : '';
+    const message = `批准批次停止：${error instanceof ApprovalError ? error.message : safeFailure(error)}${hint}\n已成功：${label(approved)}\n失败/结果未知：${label(current ? [current] : [])}\n尚未尝试：${label(unattempted)}\n请用 npm run release:approve 重新查询后续跑；不会逐包降级授权。`;
     throw new ApprovalError(message);
   } finally { otp = undefined; }
 }
