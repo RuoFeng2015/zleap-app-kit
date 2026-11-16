@@ -1,6 +1,6 @@
 {
   "name": "@zleap-ai/app-cli-win32-x64",
-  "version": "0.12.11",
+  "version": "0.12.12",
   "description": "zleap-app 预编译二进制（win32 x64 / arm64），由 @zleap-ai/app-cli 自动选用",
   "license": "MIT",
   "repository": {
@@ -19,8 +19,8 @@
   ],
   "preferUnplugged": true,
   "zleapApp": {
-    "commit": "3a40affb",
-    "sha256": "32960f693bf6321903957694e2dd521aee83984ba454df95b5fffa386c1e4094",
-    "source": "4bdb8134552e4d651b6ed1a35c812e71b5cf2ed32e1e2cce9222d5f063365796"
+    "commit": "ce64af48",
+    "sha256": "f975f2ab41ddf5fb7bb385c32ccbf0c699ff18067d33df7ab263e78dcf2acd4a",
+    "source": "53bde7723bb6fefeb90d7d10b0a1bba703aebac6b77868ebbf562ab0c77fdad9"
   }
 }

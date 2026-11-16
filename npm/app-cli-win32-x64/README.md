@@ -6,4 +6,4 @@
 npm i -D @zleap-ai/app-cli
 ```
 
-源码提交：`3a40affb`，SHA-256：`32960f693bf6321903957694e2dd521aee83984ba454df95b5fffa386c1e4094`。
+源码提交：`ce64af48`，SHA-256：`f975f2ab41ddf5fb7bb385c32ccbf0c699ff18067d33df7ab263e78dcf2acd4a`。
