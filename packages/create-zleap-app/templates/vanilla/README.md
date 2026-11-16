@@ -26,6 +26,7 @@ npm run open      # 在浏览器打开 zleapOS 并直接拉起应用，用你自
 | `npm run open` | 在浏览器直接打开应用，用本人身份测试（不用发布）；已打开的窗口点「重新加载应用」看新版本 |
 | `npm run status` | 安装、权限、可用版本 |
 | `npm run logs` | 最近 24 小时页面错误 + 本人云函数日志 |
+| `npm run fn -- new/list/run/invoke` | 云函数：新建（写好 manifest 声明）、检查、本机运行、deploy 后调用开发环境 |
 | `npm run versions` / `npm run release` | 线上版本；把最近一次 deploy 的版本发布为线上版本（全企业可见） |
 
 ## 目录

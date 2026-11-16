@@ -4,6 +4,9 @@
 //   node scripts/build-cli.mjs --source ../zleap-service              # kit.config.json 里的全部平台包
 //   node scripts/build-cli.mjs --source ../zleap-service --only linux-x64,darwin
 //   node scripts/build-cli.mjs --go /usr/local/go/bin/go               # 指定 Go
+//   node scripts/build-cli.mjs --allow-stale                           # 跳过源码新鲜度检查（只用于本地试验，不要发布）
+//
+// 编译前先确认 Go 源码包含 origin/main、CLI 用到的代码没有未提交改动（0.12.11 曾用落后的检出发布）。
 //
 // 产物：npm/app-cli-<key>/{package.json,README.md,bin/zleap-app[.exe]}，以及 npm/checksums.json。
 // 一个平台包有多个 goarch（darwin）时分别编译再用 lipo 合成通用二进制，所以构建 darwin 包需要在 macOS 上。
@@ -14,6 +17,7 @@ import { join, resolve } from 'node:path';
 
 import { arg, config, paths, platformDir, platformPackageName, platformSuffix, sdkSourceDigest, sdkSourceDir } from './lib/config.mjs';
 import { cliSourceDigest, goBuildArgs } from './lib/fingerprint.mjs';
+import { checkSourceFreshness, cliDependencyDirs } from './lib/source-check.mjs';
 
 const source = resolve(arg('source', join(paths.root, '..', 'zleap-service')));
 const go = arg('go', 'go');
@@ -36,6 +40,18 @@ if (selected.some((platform) => platform.goarch.length > 1)) {
   } catch {
     console.error('合成 macOS 通用二进制需要 lipo（macOS 自带）。请在 Mac 上构建，或用 --only 跳过 darwin。');
     process.exit(1);
+  }
+}
+
+{
+  const fresh = checkSourceFreshness(source, { dependencyDirs: cliDependencyDirs(source, go) });
+  if (!fresh.ok) {
+    const allow = process.argv.includes('--allow-stale');
+    console.error(`${allow ? '警告' : '拒绝构建'}：zleap-service 源码（${source}）不是可发布的状态：\n  - ${fresh.reasons.join('\n  - ')}`);
+    if (!allow) {
+      console.error('更新源码后重试；只在本地试验时可以加 --allow-stale（这样构建的包不要发布）。');
+      process.exit(1);
+    }
   }
 }
 

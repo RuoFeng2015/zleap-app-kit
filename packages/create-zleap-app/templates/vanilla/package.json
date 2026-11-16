@@ -20,6 +20,7 @@
     "open": "node scripts/zleap.mjs open",
     "status": "node scripts/zleap.mjs status",
     "logs": "node scripts/zleap.mjs logs",
+    "fn": "zleap-app fn",
     "versions": "node scripts/zleap.mjs versions",
     "release": "node scripts/zleap.mjs release",
     "postinstall": "node scripts/zleap.mjs sdk"

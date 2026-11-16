@@ -22,6 +22,7 @@
 | 换电脑 / 接手同事的应用：导出源码（保留原 appid，之后 deploy 更新同一个应用；需是应用成员） | `npx zleap-app source pull <appid> <新目录>` |
 | 安装/权限/版本诊断 | `npm run status` |
 | 页面错误与云函数日志（24h） | `npm run logs`（`-- --environment dev\|prod`、`--invocation <调用编号>`） |
+| 云函数（代码在 `app/cloudfunctions/<名称>/`） | `npm run fn -- new <名称> [--collection 集合 --effect write]` 生成代码并写好 manifest 三处声明；`fn -- list` 检查声明；`fn -- run <名称> --event '{...}'` 本机运行（数据落在 `.zleap/fn-data.json`，不连 OS）；deploy 后 `fn -- invoke <名称>` 调开发环境 |
 | 版本列表（含线上版本） | `npm run versions` |
 | 发布为线上版本 / 回退（全企业生效） | `npm run release -- --notes "说明" --yes`（`--version-id <id>` 指定版本）——**只在用户明确要求发布时执行**；发布后本人窗口也改用正式数据，开发期数据留在调试域（要继续用调试域测试就再 `npm run deploy` 一个开发版本） |
 
