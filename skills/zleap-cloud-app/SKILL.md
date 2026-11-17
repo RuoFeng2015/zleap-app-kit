@@ -38,6 +38,7 @@ React 模板、vanilla 模板、原生模板走同一条路线。目的是不重
    `api.fetch` 不依赖云环境：**只调 OS 接口、没有集合 / 云函数 / 云文件的应用，不要调用 `zl.cloud.init` 和 `zl.cloud.os.ready()`**（这类应用平台不准备云环境，`ready()` 会报 `ENV_FORBIDDEN`），连接状态以第一次 `api.fetch` 成功为准。模板里的 `init`/`ready` 是给云数据库用的，删掉集合时一并删掉。集合和 OS 接口混用时两边分开降级：数据库没就绪时 OS 数据照常显示，只在用到集合的区块提示稍后重试。
 3. **应用自己产生的数据才建集合**（`db.collection`，在 manifest 声明）。
 4. **以上都没有的后端逻辑才写云函数**（references/cloud-functions.md）。云函数不能调 OS 接口，需要 OS 数据时由页面取到后传入。
+   新建用 `npm run fn -- new <名称> [--collection 集合 --effect write]`（生成代码、类型声明，并写好 manifest 三处声明），不要手写这三处；`npm run fn -- list` 检查声明，`npm run fn -- run <名称> --event '{...}'` 在本机运行（数据落在 `.zleap/fn-data.json`，权限按声明核对，不连 OS）。
 
 一个接口不可用时先找替代接口，搜不到再判断 OS 没有；不要猜接口路径，也不要读平台源码。
 
@@ -97,7 +98,7 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
    - 报未登录/会话过期 → 请用户运行 `npm run login -- --target <OS 地址>` 并在浏览器核对确认码。
    - 报 `DATA_MIGRATION_REQUIRED` → 新版本改了 data/storage 声明，见第 5 节。
 6. **请用户验收**（按这条功能的「做完能看到」逐条核对，并顺手回归之前做好的功能）：安装时平台会自动创建开发环境、开通数据库并按声明建集合，`npm run deploy` 结束时会打印状态；显示未就绪时，请用户在「云开发控制台」选中应用 →「概览」按提示处理。然后运行 `npm run open`（在浏览器打开 zleapOS 并直接拉起本人已装的版本，开发版本不用发布就能测；没装会提示先 deploy），或从启动台打开（已打开的点「重新加载应用」）。
-7. **排查**：`npm run status`（安装、权限、版本）、`npm run logs`（24h 页面结构化错误 + 本人云函数日志，自动选当前所在环境）、控制台「运行体检」。云函数可以不经界面直接测：`npx zleap-app invoke --capability <id> --environment dev --input-file payload.json`（项目目录里省略应用 ID），再 `npm run logs -- --invocation <编号>`。改完回到第 4 步。
+7. **排查**：`npm run status`（安装、权限、版本）、`npm run logs`（24h 页面结构化错误 + 本人云函数日志，自动选当前所在环境）、控制台「运行体检」。云函数可以不经界面直接测：`npm run fn -- invoke <函数名> --event '{...}'`（默认开发环境），再 `npm run fn -- logs <编号>`。返回 `CAPABILITY_NOT_ACTIVE` 时不需要 prepare：请用户打开应用 →「权限」勾选该后台能力 →「保存并重新加载」→ 确认框「确定」（结果里的 `open_url` / `next` 有链接和步骤），开发工具不能代为开启。改完回到第 4 步。
 
 **换电脑 / 接手同事的应用**：`npm run deploy` 会自动附带源码快照（不含依赖、构建产物、密钥类文件；`--no-source` 可关）。
 应用成员先 `npx @zleap-ai/app-cli auth login --target <OS> --app-key <appid>`，再 `npx @zleap-ai/app-cli source pull <appid> <新目录>` 导出（保留原 appid），
@@ -113,8 +114,8 @@ manifest 里写 `"appid": "<appid>"`，不要写 `app_key` 和 `publisher`。CLI
   再在**按钮点击事件里**调用 `zl.auth.authorize({ scopes: ['profile' | 'phone' | 'email'], reason: '用途说明' })`（不在点击里调用 `AUTH_GESTURE_REQUIRED`），
   返回 `{ openid, scopes, profile?, phone?, email? }`——用户可以只勾选一部分、没绑定的不返回，**以 `scopes` 判断拿到了什么**；
   拒绝时 `AUTH_DENIED`（拒绝过的项 24 小时内不再弹框，直接 `AUTH_DENIED`）。`zl.auth.getIdentity()` 静默拿 `openid`（每个应用不同、开发与线上一致）。
-  云函数里**没有** `zl.cloud.auth`（`getOpenId()` / `getUserInfo()` 都不可用）：需要 openid 时由页面 `getIdentity()` 取到后作为输入传给函数，或用文档自带的 `_openid`；不要用 `getContext().userId`（平台内部 ID，已废弃）。
-  不要自己做登录页或索要账号；云函数里读不到授权信息。
+  云函数里用 `await zl.cloud.auth.getOpenId()` 取调用者 openid（平台给出，可信），`getUserInfo()` 取用户同意过的信息；节点较旧的部署没有 `zl.cloud.auth`，用 `zl.cloud.auth?.getOpenId` 判断后回退到页面传入的 openid 或文档自带的 `_openid`。不要用 `getContext().userId`（平台内部 ID，已废弃）。
+  不要自己做登录页或索要账号。
 - 都从 `@zleap-ai/app-sdk` 导入（`import { zl, AppError } from '@zleap-ai/app-sdk'`），完整说明见 references/app-runtime.md。
 
 ## 4. 只有用户能做的事（明确告诉用户，不要假装已完成）
