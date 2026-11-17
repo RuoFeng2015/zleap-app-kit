@@ -261,14 +261,12 @@ if (!scopes.includes('profile')) {
 
 见 安装与卸载 · 已授权信息（文档站 /app-center/install#已授权信息）。
 
-### 在云函数里读取
+### 在云函数里读取（暂不可用）
 
-云函数服务端 SDK（`@zleap/app-cloud-server`）提供 `zl.cloud.auth`：
+当前云函数服务端 SDK（`@zleap/app-cloud-server`）只有 `init`、`getContext`、`getLogger`、`os.database`，
+**没有 `zl.cloud.auth` 命名空间**：`getOpenId()` / `getUserInfo()` 都不可用，函数也拿不到用户在前端授权框里同意的信息。
 
-- `await zl.cloud.auth.getOpenId()`：调用者在本应用里的 `openid`，与页面 `getIdentity()` 一致，不需要用户同意；
-- `await zl.cloud.auth.getUserInfo()`：`{ openid, appid, scopes, profile?, phone?, email? }`，只带用户在页面授权框里同意过的项，以 `scopes` 判断拿到了什么。
-
-这两个值由平台按调用身份给出，函数可以信任。`zl.cloud.auth` 由函数计算节点提供（2026-11-01 之后的节点，2026-11-16 在 .6 实测可用）；节点较旧的部署上没有这个命名空间，调用前用 `zl.cloud.auth?.getOpenId` 判断，没有时用下面的替代方式：
+需要 `openid` 时用下面的替代方式：
 
 1. **页面取，作为输入传**：页面用 `zl.auth.getIdentity()`（或 `authorize()`）拿到 `openid`，放进能力的 `input`：
 
@@ -285,7 +283,7 @@ if (!scopes.includes('profile')) {
 注意：
 
 - 由页面传入的 `openid`、手机号、邮箱都只是**业务参数**，函数无法再向平台核验；不要把前端传来的手机号当成平台认证过的身份。
-- 撤销授权后页面 `getIdentity()` 仍返回 `openid`，但不再带之前同意的信息；云函数里 `getUserInfo()` 同样不再返回已撤销的项。
+- 撤销授权后页面 `getIdentity()` 仍返回 `openid`，但不再带之前同意的信息；云函数没有可读取授权信息的接口。
 - `getContext().userId` 是平台内部用户 ID，**已废弃**，新应用不要用它作为业务用户键。
 
 ## 复制到剪贴板
