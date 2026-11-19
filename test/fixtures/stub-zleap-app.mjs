@@ -30,7 +30,11 @@ switch (command) {
   }
   case 'status':
     if (!state.loggedIn) fail('请先在终端运行 zleap-app auth login，勿向MCP提供密码');
-    out(state.packages);
+    {
+      const appKeyIndex = rest.indexOf('--app-key');
+      const scope = appKeyIndex >= 0 ? rest[appKeyIndex + 1] : state.defaultAppKey;
+      out(scope ? state.packages.filter((row) => row.app_key === scope) : state.packages);
+    }
     break;
   case 'publish': {
     if (!state.loggedIn) fail('请先在终端运行 zleap-app auth login，勿向MCP提供密码');

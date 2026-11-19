@@ -54,7 +54,7 @@ test('首次部署：构建 → 检查 → 上传 → 安装，并记录状态',
   const { dir, deploy, state } = project();
   const result = deploy();
   assert.equal(result.status, 0, result.stderr + result.stdout);
-  assert.deepEqual(state().calls, ['check dist', 'status', 'deploy . --package-dir dist']);
+  assert.deepEqual(state().calls, ['check dist', 'status --app-key com.acme.todo', 'deploy . --package-dir dist']);
   const saved = JSON.parse(readFileSync(join(dir, '.zleap/state.json'), 'utf8'));
   assert.equal(saved.appId, '93');
   assert.equal(saved.versionId, '500');
@@ -203,7 +203,7 @@ test('vanilla 模板：不构建，复制 SDK 后检查并部署 app/', () => {
   const { dir, deploy, state } = project({}, 'zl0123456789abcdef', 'vanilla');
   const result = deploy();
   assert.equal(result.status, 0, result.stderr + result.stdout);
-  assert.deepEqual(state().calls, ['check app', 'status', 'deploy . --package-dir app']);
+  assert.deepEqual(state().calls, ['check app', 'status --app-key zl0123456789abcdef', 'deploy . --package-dir app']);
   assert.equal(readFileSync(join(dir, 'app/sdk/index.js'), 'utf8'), '// index.js\n');
   assert.ok(!existsSync(join(dir, 'dist')));
   assert.equal(JSON.parse(readFileSync(join(dir, '.zleap/state.json'), 'utf8')).appId, '93');
@@ -313,4 +313,21 @@ test('版本号高于已上传版本：不改版本号', () => {
   const result = deploy();
   assert.equal(result.status, 0, result.stderr + result.stdout);
   assert.doesNotMatch(result.stdout + result.stderr, /不高于已上传的版本|自动改为/);
+});
+
+
+test('切换到其他项目登录后，部署仍按当前 appid 查版本并自动递增', () => {
+  const appid = 'zl00000000000000aa';
+  const { dir, deploy, state } = project({
+    defaultAppKey: 'zl00000000000000bb',
+    contentTag: 'v2',
+    packages: [
+      { app_key: appid, version: '1.0.0', digest: '1.0.0-v1', visibility: 'members', version_id: 400 },
+      { app_key: 'zl00000000000000bb', version: '9.0.0', digest: 'other', visibility: 'members', version_id: 401 },
+    ],
+  }, appid);
+  const result = deploy();
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'manifest.json'), 'utf8')).version, '1.0.1');
+  assert.ok(state().calls.includes('status --app-key ' + appid));
 });

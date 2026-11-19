@@ -204,7 +204,7 @@ function durationMinutes(text) {
 }
 
 function publishedVersions() {
-  const result = cli(['status']);
+  const result = cli(['status', '--app-key', appIdOf(manifest())]);
   if (result.code !== 0) {
     if (needLogin(result.stderr)) throw new StepError(`${result.stderr}\n先运行 npm run login`);
     throw new StepError(`读取已上传版本失败：${result.stderr}`);
