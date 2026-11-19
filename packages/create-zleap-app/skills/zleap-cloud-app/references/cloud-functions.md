@@ -28,6 +28,42 @@
 | 只是读一条文档 / 改一条文档  | `logic_unit` 或 `builtin`（`clouddb.document.*`） | 不进函数沙箱，不需要签名发布 |
 | 调用大模型                   | `builtin` + `os.agent.complete`                   | 平台持有凭据，应用不接触密钥 |
 
+## 用命令行新建、本地运行（推荐） {#cli}
+
+不用手写下面三处声明：在项目根目录用 `zleap-app fn`（脚手架项目里是 `npm run fn -- …`，需要 `@zleap-ai/app-cli` 0.12.12 及以上）。
+
+```bash
+zleap-app fn new summarize --collection notes --effect write --title 汇总笔记
+zleap-app fn list                                          # 列出函数，检查三处声明是否对得上
+zleap-app fn run summarize --event '{"message":"hi"}'      # 本机运行，不连 OS
+# npm run deploy 之后：
+zleap-app fn invoke summarize --event '{"message":"hi"}'   # 按函数名调用开发环境
+zleap-app fn logs [调用编号]                                # 开发环境的云函数日志
+```
+
+**`fn new <名称>`** 一次写好：
+
+- `cloudfunctions/<名称>/index.mjs`：带幂等操作号、`request_id` 写法的模板；
+- `cloudfunctions/zleap-cloud-server.d.ts` 和 `jsconfig.json`：编辑器里 `zl.cloud.*` 有补全，文件开头加 `// @ts-check` 可开启严格检查；
+- Manifest 的 `runtime.backend.functions`、`providers`（`managed_function`）、`capabilities.provides`（能力 id 为 `<appid>.<名称>`）三处；
+- `--collection` 的集合补进 `data.collections`，`cloud.database.read/write` 补进 `requires`，授权字段默认取 `data.schemas` 里该集合声明的字段（没有 schema 时先写 `value`、`updated_at`，按实际读写的字段改）；
+- `execution` 改为 `both`（有页面又有后台函数时必须是 `both`）。
+
+不构建的项目（vanilla 模板）Manifest 在 `app/` 里，函数也生成在 `app/cloudfunctions/`。函数路径一律相对 Manifest 所在目录，和上传时一致。
+
+**`fn run <名称>`** 用本机 Node（至少 22.15，建议与平台一致用 24）运行，加载方式和平台沙箱相同：
+
+- 数据库调用落到本地文件 `.zleap/fn-data.json`，不连 OS。这个文件可以手工编辑当作种子数据；`--reset-data` 清空，`--user` 换本地调用用户（影响 `getOpenId()` 的返回值）。
+- 读写权限按 provider 声明逐请求核对，规则与平台相同：集合、动作、字段不在声明里会返回 `PERMISSION_DENIED`；`request_id`、`operation_id` 写错也会报和线上一样的错误码。
+- 运行前用 `input_schema` 校验输入，运行后用 `output_schema` 校验返回值；结果里带 SDK 日志和每次数据库调用的明细。
+- 本地只模拟查询语义和权限，**不模拟**集合 schema 校验、读写规则（`policies`）和共享集合分区。真实行为以 deploy 后的 `fn invoke` 为准。
+
+函数代码随应用包上传；在应用中心「我的发布」、云开发控制台「版本管理」里点「导出工程文件」，或用 `source pull` 导出时，`cloudfunctions/` 也会一起导出，接手的人可以直接 `fn run` 接着开发（见 导出源码继续开发（文档站 /guide/continue-dev））。
+
+`npm run deploy` 之后，云开发控制台「云函数」页能看到每个函数的入口、运行环境和状态，状态是「可调用」就可以用 `fn invoke` 调用：
+
+（截图：deploy 之后，控制台「云函数」页列出 tally、summary 两个函数，状态都是「可调用」，见文档站）
+
 ## 第一步：在 Manifest 里声明
 
 一个同时有界面和云函数的应用，`execution` 要写 **`"both"`**（不是 `hybrid`）。
@@ -184,15 +220,17 @@ export async function main(event, context) {
 
 导入来源是 `@zleap/app-cloud-server`（和前端的 `./sdk/index.js` 不是同一个包）。它**只有**下面这些 API：
 
-| API                                                    | 说明                                                                                       |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `zl.cloud.init({ env: zl.cloud.DYNAMIC_CURRENT_ENV })` | 建议第一行调用。只接受 `env: DYNAMIC_CURRENT_ENV` 或不传；写 `'dev'` 等会抛 `ENV_MISMATCH` |
-| `zl.cloud.getContext()`                                | 本次调用的上下文（见下表）                                                                 |
-| `zl.cloud.getLogger()`                                 | 结构化日志                                                                                 |
-| `zl.cloud.os.database.query(args)`                     | 读（只支持 `get` 单条 / `count` 计数）                                                     |
-| `zl.cloud.os.database.mutate(args)`                    | 写（`add` / `set` / `update` / `remove`）                                                  |
+| API                                                    | 说明                                                                                                    |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `zl.cloud.init({ env: zl.cloud.DYNAMIC_CURRENT_ENV })` | 建议第一行调用。只接受 `env: DYNAMIC_CURRENT_ENV` 或不传；写 `'dev'` 等会抛 `ENV_MISMATCH`              |
+| `zl.cloud.getContext()`                                | 本次调用的上下文（见下表）                                                                              |
+| `zl.cloud.getLogger()`                                 | 结构化日志                                                                                              |
+| `zl.cloud.os.database.query(args)`                     | 读（只支持 `get` 单条 / `count` 计数）                                                                  |
+| `zl.cloud.os.database.mutate(args)`                    | 写（`add` / `set` / `update` / `remove`）                                                               |
+| `await zl.cloud.auth.getOpenId()`                      | 调用者在本应用里的 `openid`（与页面 `zl.auth.getIdentity()` 一致，不需要用户同意）                      |
+| `await zl.cloud.auth.getUserInfo()`                    | `{ openid, appid, scopes, profile?, phone?, email? }`：用户在页面授权框里同意过的信息，没同意的项不返回 |
 
-云函数里**没有** `zl.cloud.database()`、文件存储、`callFunction` 或能力调用，也**没有** `zl.cloud.auth`：`getOpenId()` / `getUserInfo()` 目前不可用。需要 `openid` 时，由页面用 `zl.auth.getIdentity()` 取到后作为输入传入，或使用文档自带的 `_openid`（见下文）。
+云函数里**没有** `zl.cloud.database()`、文件存储、`callFunction` 或能力调用。`zl.cloud.auth` 由函数计算节点提供（2026-11-01 之后的节点，2026-11-16 在 .6 实测可用）；节点较旧的部署上没有这个命名空间，见下文「用 openid 区分用户」的兼容写法。
 
 ### `getContext()`
 
@@ -362,14 +400,17 @@ await zl.cloud.os.database.mutate({
 
 数据范围由平台按调用身份和数据绑定自动限定，函数里传 `user_id` 之类的字段绕不过去。
 
-> **用 openid 区分用户：从输入或 `_openid` 来**（提示）
+> **用 openid 区分用户**（提示）
 >
-> 当前服务端 SDK **没有** `zl.cloud.auth.getOpenId()` / `getUserInfo()`。需要「谁的数据」这类键时，有两个来源：
+> 函数里用 `await zl.cloud.auth.getOpenId()` 取调用者的 `openid`，它由平台按调用身份给出，可以信任；要用户同意过的头像昵称 / 手机号 / 邮箱用 `getUserInfo()`，以返回的 `scopes` 判断拿到了什么。
 >
-> - 页面用 `zl.auth.getIdentity()` 拿到 `openid`，作为能力的输入传给函数；
-> - 私有集合里读到的文档自带 `_openid`（写入者标识），可以直接用（`examples/moments` 的 `stats` 就是这么做的）。
+> 节点较旧的部署上 `zl.cloud.auth` 不存在，要兼容时先判断再回退：
 >
-> 由页面传入的 `openid` 只是业务参数，函数无法再向平台核验；手机号 / 邮箱同理，函数拿不到授权登录的信息。
+> ```js
+> const openid = zl.cloud.auth?.getOpenId ? await zl.cloud.auth.getOpenId() : event?.openid;
+> ```
+>
+> 回退的两个来源：页面用 `zl.auth.getIdentity()` 拿到 `openid` 作为输入传入（这只是业务参数，函数无法再向平台核验）；或者用私有集合文档自带的 `_openid`（`examples/moments` 的 `stats` 就是这么做的）。
 > `getContext().userId` 是平台内部用户 ID，不要用它区分业务用户，也不要存它、返回给前端。
 
 ### 读写失败时拿到什么
@@ -591,11 +632,15 @@ npx zleap-app publish dist
 ② 安装（安装即授予声明的 cloud.* 权限；后台能力为「停用」）
    安装、切换版本时平台自动把安装绑定到该版本的就绪发布；还没有就绪发布的版本会当场补签再绑定
 ③ 开发环境与数据库：声明了集合的应用安装时自动创建并开通（集合按声明自动创建）；否则在控制台「创建开发环境」
-④ 应用窗口「权限」→「后台能力（定时任务 / 云函数）」勾选该能力 →「保存并重新加载」
+④ 应用窗口「权限」→「后台能力（定时任务 / 云函数）」勾选该能力 →「保存并重新加载」→ 在「确认修改应用权限？」里点「确定」
+   （漏点「确定」不会保存，调用仍是 CAPABILITY_NOT_ACTIVE）
    （或在控制台「后台能力」里点「允许后台运行」）
 ```
 
 带后台能力的版本在上传时由平台自动签名；安装、切换版本、在「权限」里允许后台运行时会自动绑定，没有单独的签名或绑定步骤。
+
+第一次 `npm run deploy` 时，如果开发环境还没就绪，部署输出里会有「准备资源」这一步。这一步会顺带为部署者本人启用当时已声明的后台能力，第一个函数通常可以直接调用。
+**之后新增的函数不会自动启用**，要按 ④ 勾选；没勾选时调用返回 `CAPABILITY_NOT_ACTIVE`，见下方 [从命令行试调](#从命令行试调)。
 
 详细界面见 版本管理（文档站 /console/release）、云函数与后台能力（文档站 /console/functions）、安装与卸载（文档站 /app-center/install），
 端到端顺序见 从开发到上线（文档站 /guide/dev-to-production）。
@@ -719,8 +764,26 @@ zleap-app invoke <app_id> --capability com.example.studio.review-draft --environ
 zleap-app invocation <app_id> <调用编号>   # 查最新状态与结果
 ```
 
-`--environment` 默认 `prod`，`--wait-seconds` 为 0–30（默认 25）。能力没在该环境启用时返回 `CAPABILITY_NOT_ACTIVE`：
-开发工具不会代你允许后台运行，需要在应用窗口「权限」里勾选。函数日志用 `zleap-app runtime-logs <app_id> <调用编号> --environment dev` 查。
+`--environment` 默认 `prod`，`--wait-seconds` 为 0–30（默认 25）。在项目目录里可以直接按函数名调用（默认开发环境，先校验输入）：
+
+```bash
+zleap-app fn invoke reviewContent --input-file input.json
+zleap-app fn logs <调用编号>
+```
+
+能力没在该环境启用时返回 `CAPABILITY_NOT_ACTIVE`。开发工具不会代你允许后台运行，平台 appid 应用也**不需要** `prepare`，按下面的步骤操作：
+
+1. 打开应用：`zleap-app open`，或浏览器打开 `<OS 地址>/?open_app=<appid>`；
+2. 点窗口顶部「权限」，在「后台能力（定时任务 / 云函数）」里勾选这个能力（列表显示的是能力标题，即 `fn new --title` 的值）；
+3. 点「保存并重新加载」，再在确认框里点「确定」；
+4. 重新调用。
+
+（截图：应用窗口「权限」对话框：「后台能力（定时任务 / 云函数）」里勾选「记一笔」「汇总」，见文档站）
+
+（截图：点「保存并重新加载」后的确认框「确认修改应用权限？」，要点「确定」才会保存，见文档站）
+
+`detail.next` 和 `fn invoke` 的结果（`open_url`、`next`）里都会给出这些步骤；如果能力只在另一个环境启用，会提示改用那个环境。
+函数日志也可以用 `zleap-app runtime-logs <app_id> <调用编号> --environment dev` 查；返回 `LOG_NOT_PROVISIONED` 表示这个应用的日志库还没开通，要联系平台管理员处理，不是函数的问题。
 
 ## 系统 Agent 与平台内置动作
 
