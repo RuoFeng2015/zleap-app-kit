@@ -16,6 +16,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { arg, config, flag, paths, platformDir, platformPackageName, platformSuffix, readJSON } from './lib/config.mjs';
+import { checkCliMCP, runnablePlatform } from './lib/cli-mcp-check.mjs';
 
 const dryRun = flag('dry-run');
 const tag = arg('tag', 'latest');
@@ -76,6 +77,7 @@ for (const { dir, platform } of todo.filter((target) => target.platform)) {
     console.error(`${key} 二进制与 checksums.json 不一致，请重新构建`);
     process.exit(1);
   }
+  if (runnablePlatform(platform)) await checkCliMCP(binary, paths.root);
 }
 
 if (todo.some((target) => target.dir === paths.sdk)) {

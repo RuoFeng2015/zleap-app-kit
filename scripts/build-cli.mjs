@@ -12,12 +12,14 @@
 // 一个平台包有多个 goarch（darwin）时分别编译再用 lipo 合成通用二进制，所以构建 darwin 包需要在 macOS 上。
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import { arg, config, paths, platformDir, platformPackageName, platformSuffix, sdkSourceDigest, sdkSourceDir } from './lib/config.mjs';
 import { cliSourceDigest, goBuildArgs } from './lib/fingerprint.mjs';
 import { checkSourceFreshness, cliDependencyDirs } from './lib/source-check.mjs';
+import { checkCliMCP, runnablePlatform } from './lib/cli-mcp-check.mjs';
 
 const source = resolve(arg('source', join(paths.root, '..', 'zleap-service')));
 const go = arg('go', 'go');
@@ -77,6 +79,20 @@ const sdk = sdkSourceDigest(sdkSourceDir(source)).digest;
 // CLI 源码指纹写进平台包的 package.json（zleapApp.source），release 拿它和 npm 上的版本比，判断 CLI 要不要发版。
 const cliSource = cliSourceDigest(source, go);
 
+if (!selected.some(runnablePlatform)) {
+  const scratch = mkdtempSync(join(tmpdir(), 'zleap-native-cli-'));
+  try {
+    const binary = join(scratch, process.platform === 'win32' ? 'zleap-app.exe' : 'zleap-app');
+    const { GOOS: _goos, GOARCH: _goarch, ...env } = process.env;
+    execFileSync(go, [...goBuildArgs(config.cliVersion, commit), '-o', binary, './cmd/zleap-app'], {
+      cwd: source, stdio: 'inherit', env: { ...env, CGO_ENABLED: '0', GOFLAGS: '-buildvcs=false' },
+    });
+    await checkCliMCP(binary, paths.root);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
 const checksumsFile = join(paths.npm, 'checksums.json');
 const previous = existsSync(checksumsFile) ? JSON.parse(readFileSync(checksumsFile, 'utf8')) : {};
 // 只保留仍在 kit.config.json 里的平台包，已合并 / 下线的平台不再留校验值。
@@ -105,6 +121,7 @@ for (const platform of selected) {
     for (const slice of slices) rmSync(slice);
   }
   if (platform.goos !== 'windows') chmodSync(output, 0o755);
+  if (runnablePlatform(platform)) await checkCliMCP(output, paths.root);
 
   const digest = createHash('sha256').update(readFileSync(output)).digest('hex');
   checksums[platformSuffix(platform)] = { file: `bin/${exe}`, sha256: digest, commit, source: cliSource, sdk };
